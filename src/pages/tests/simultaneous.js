@@ -345,7 +345,7 @@ function showResult(score, testName, achieved, total, nextSubIndex) {
 
 /* ===== 题目生成器 ===== */
 function generateMatrixQuestions(count) {
-    // 图形模式推理
+    // 图形模式推理 - 扩展题库
     const patterns = [
         { shapes: ['🔴', '🔵', '🟢'], rule: 'row-color' },
         { shapes: ['⬛', '⬜', '🟫'], rule: 'row-shade' },
@@ -355,33 +355,56 @@ function generateMatrixQuestions(count) {
         { shapes: ['🐱', '🐶', '🐰'], rule: 'row-animal' },
         { shapes: ['❤️', '💛', '💙'], rule: 'row-heart' },
         { shapes: ['🌲', '🌻', '🍄'], rule: 'row-nature' },
+        { shapes: ['🔶', '🔷', '🔸'], rule: 'row-diamond' },
+        { shapes: ['🎀', '🎁', '🎈'], rule: 'row-party' },
+        { shapes: ['🐟', '🐬', '🐙'], rule: 'row-sea' },
+        { shapes: ['🚗', '🚌', '🚲'], rule: 'row-vehicle' },
+        { shapes: ['🌈', '🌊', '🍃'], rule: 'row-element' },
+        { shapes: ['🎵', '🎶', '🎼'], rule: 'row-music' },
+        { shapes: ['🔑', '🔒', '🔔'], rule: 'row-metal' },
     ];
 
+    const allShapes = ['🔴', '🔵', '🟢', '⬛', '⬜', '▲', '■', '●', '🌙', '⭐', '🔶', '🔷', '🎀', '🐟', '🚗'];
+
     const questions = [];
+    // 打乱模式顺序，避免重复
+    const shuffledPatterns = [...patterns].sort(() => Math.random() - 0.5);
+
     for (let q = 0; q < count; q++) {
-        const pattern = patterns[q % patterns.length];
+        const pattern = shuffledPatterns[q % shuffledPatterns.length];
         const matrix = [];
-        // 每行一种图案
+
+        // 使用不同的排列方式增加多样性
+        const ruleType = q % 3; // 0=行循环, 1=列循环, 2=对角线
         for (let r = 0; r < 3; r++) {
             for (let c = 0; c < 3; c++) {
-                matrix.push(pattern.shapes[(r + c) % 3]);
+                if (ruleType === 0) {
+                    matrix.push(pattern.shapes[(r + c) % 3]);
+                } else if (ruleType === 1) {
+                    matrix.push(pattern.shapes[(c + r * 2) % 3]);
+                } else {
+                    matrix.push(pattern.shapes[(r + c + 1) % 3]);
+                }
             }
         }
 
-        const missingIndex = Math.floor(Math.random() * 3) + 6; // 最后一行的某个位置
+        // 随机选择缺失位置（后两行更具挑战性）
+        const missingRow = q < count / 2 ? 2 : 1 + Math.floor(Math.random() * 2);
+        const missingCol = Math.floor(Math.random() * 3);
+        const missingIndex = missingRow * 3 + missingCol;
         const correctAnswer = matrix[missingIndex];
 
-        // 选项
-        const options = [...pattern.shapes];
-        // 随机加入干扰项
-        const allShapes = ['🔴', '🔵', '🟢', '⬛', '⬜', '▲', '■', '●', '🌙', '⭐'];
+        // 生成干扰选项
+        const options = [correctAnswer];
+        // 添加同组其他形状
+        pattern.shapes.forEach(s => { if (!options.includes(s)) options.push(s); });
+        // 添加额外干扰
         while (options.length < 4) {
-            const randShape = allShapes[Math.floor(Math.random() * allShapes.length)];
-            if (!options.includes(randShape)) options.push(randShape);
+            const rand = allShapes[Math.floor(Math.random() * allShapes.length)];
+            if (!options.includes(rand)) options.push(rand);
         }
 
-        // 打乱选项
-        const shuffled = options.sort(() => Math.random() - 0.5);
+        const shuffled = options.slice(0, 4).sort(() => Math.random() - 0.5);
         const correctIndex = shuffled.indexOf(correctAnswer);
 
         questions.push({ matrix, missingIndex, options: shuffled, correctIndex });
@@ -400,12 +423,21 @@ function generateSpatialQuestions(count) {
         { question: '下面哪个能拼组成正方形？', display: '◤ + ?', options: ['◢', '◣', '◥', '▲'], correctIndex: 0 },
         { question: '镜像翻转后，箭头指向哪？', display: '→', options: ['←', '→', '↑', '↓'], correctIndex: 0 },
         { question: '🟢在🔴和🔵之间属于什么位置？', display: '🔴 🟢 🔵', options: ['居中', '偏左', '偏右', '不确定'], correctIndex: 0 },
-        { question: '下面哪个形状有4条边？', display: '❓', options: ['◆', '▲', '●', '⬟'], correctIndex: 0 }
+        { question: '下面哪个形状有4条边？', display: '❓', options: ['◆', '▲', '●', '⬟'], correctIndex: 0 },
+        { question: '把 ◀️ 顺时针旋转90°，变成什么？', display: '◀️ → ?', options: ['🔼', '🔽', '▶️', '◀️'], correctIndex: 0 },
+        { question: '等边三角形有几条对称轴？', display: '△（等边）', options: ['3条', '1条', '2条', '0条'], correctIndex: 0 },
+        { question: '从正上方看圆柱体，看到什么形状？', display: '🔵 (俯视)', options: ['圆形', '长方形', '三角形', '梯形'], correctIndex: 0 },
+        { question: '🔴在🔵的上方，🟢在🔵的右边，🟢在🔴的什么方向？', display: '🔴\n🔵 🟢', options: ['右下方', '左下方', '右上方', '正右方'], correctIndex: 0 },
+        { question: '哪两个形状完全一样？', display: '🔷 🔶 🔷 🔸', options: ['第1和第3', '第1和第2', '第2和第4', '第3和第4'], correctIndex: 0 },
+        { question: '下面哪个图形旋转180°后和原来一样？', display: '?', options: ['⬟', '▲', '◀️', '🔶'], correctIndex: 3 },
+        { question: '🏠的左边是🌲，右边是🚗，中间是什么？', display: '🌲 🏠 🚗', options: ['🏠', '🌲', '🚗', '什么都没有'], correctIndex: 0 },
+        { question: '将正方形对角线切开，得到什么形状？', display: '■ → ✂️', options: ['两个三角形', '两个长方形', '一个梯形', '四个三角形'], correctIndex: 0 },
     ];
 
     const questions = [];
+    const shuffled = [...templates].sort(() => Math.random() - 0.5);
     for (let i = 0; i < count; i++) {
-        questions.push(templates[i % templates.length]);
+        questions.push(shuffled[i % shuffled.length]);
     }
     return questions;
 }
@@ -418,6 +450,10 @@ function generateWordQuestions(count, ageGroup) {
         { question: '"眼睛" 对 "看"，就像 "耳朵" 对 ___', options: ['听', '说', '鼻子', '脸'], correctIndex: 0 },
         { question: '哪个词和 "快乐" 意思最接近？', options: ['高兴', '悲伤', '生气', '害怕'], correctIndex: 0 },
         { question: '"春天" 对 "温暖"，就像 "冬天" 对 ___', options: ['寒冷', '炎热', '凉爽', '温暖'], correctIndex: 0 },
+        { question: '下面哪个不是动物？', options: ['桌子', '小猫', '小鸟', '金鱼'], correctIndex: 0 },
+        { question: '"大" 的反义词是什么？', options: ['小', '多', '高', '长'], correctIndex: 0 },
+        { question: '"铅笔" 对 "写"，就像 "剪刀" 对 ___', options: ['剪', '画', '量', '折'], correctIndex: 0 },
+        { question: '下面哪个词表示颜色？', options: ['紫色', '圆形', '响亮', '柔软'], correctIndex: 0 },
     ];
 
     const hardQuestions = [
@@ -429,14 +465,21 @@ function generateWordQuestions(count, ageGroup) {
         { question: '"蜂蜜" 对 "甜"，就像 "柠檬" 对 ___', options: ['酸', '苦', '辣', '咸'], correctIndex: 0 },
         { question: '下列哪个是 "知识" 的上位概念？', options: ['信息', '书本', '学校', '考试'], correctIndex: 0 },
         { question: '"树干" 对 "树"，就像 "轮子" 对 ___', options: ['汽车', '道路', '速度', '橡胶'], correctIndex: 0 },
+        { question: '"鱼" 对 "水"，就像 "鸟" 对 ___', options: ['天空', '树', '巢', '虫子'], correctIndex: 0 },
+        { question: '下面哪个成语和 "画蛇添足" 意思相近？', options: ['多此一举', '锦上添花', '雪中送炭', '杯水车薪'], correctIndex: 0 },
+        { question: '"整体" 和 "局部" 的关系类似于___', options: ['森林和树木', '苹果和香蕉', '红色和蓝色', '快速和缓慢'], correctIndex: 0 },
+        { question: '"钟表" 对 "时间"，就像 "温度计" 对 ___', options: ['温度', '水银', '玻璃', '科学'], correctIndex: 0 },
+        { question: '下面哪个词和其他三个不是一类？', options: ['跑步', '游泳', '阅读', '跳远'], correctIndex: 2 },
+        { question: '"必要条件" 和 "充分条件" 是什么关系？', options: ['互为对比', '完全相同', '包含关系', '因果关系'], correctIndex: 0 },
     ];
 
     const isYoung = ['幼儿组', '小学低年级组'].includes(ageGroup);
     const pool = isYoung ? easyQuestions : [...easyQuestions, ...hardQuestions];
 
     const questions = [];
+    const shuffled = [...pool].sort(() => Math.random() - 0.5);
     for (let i = 0; i < count; i++) {
-        questions.push(pool[i % pool.length]);
+        questions.push(shuffled[i % shuffled.length]);
     }
     return questions;
 }

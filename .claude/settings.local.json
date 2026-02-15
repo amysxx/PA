@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /e/anigravity/src -type f -name \"*.js\" -exec grep -l \"export\\\\|download\\\\|csv\\\\|json\\\\|chart\\\\|graph\\\\|analysis\\\\|statistics\" {} ;)",
+      "Bash(wc -l /e/anigravity/src/pages/tests/*.js)",
+      "Bash(wc -l /e/anigravity/src/**/*.js)"
+    ]
+  }
+}

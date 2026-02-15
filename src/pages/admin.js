@@ -4,59 +4,65 @@
 import { router } from '../router.js';
 import { store } from '../store.js';
 import { userManager } from '../userManager.js';
+import { exportUsersToExcel, exportToJSON } from '../utils/dataExport.js';
+import { generateClassReportPDF } from '../utils/pdfGenerator.js';
 
 export function renderAdmin(app) {
-    const users = userManager.getUsers();
+  const users = userManager.getUsers();
 
-    const avatarEmojis = ['🦊', '🐱', '🐶', '🐼', '🐨', '🦁', '🐸', '🐵', '🐰', '🐻', '🦄', '🐯', '🐷', '🐮', '🐲'];
-    function getAvatar(index) {
-        return avatarEmojis[index % avatarEmojis.length];
-    }
+  const avatarEmojis = ['🦊', '🐱', '🐶', '🐼', '🐨', '🦁', '🐸', '🐵', '🐰', '🐻', '🦄', '🐯', '🐷', '🐮', '🐲'];
+  function getAvatar(index) {
+    return avatarEmojis[index % avatarEmojis.length];
+  }
 
-    function formatDate(ts) {
-        if (!ts) return '-';
-        const d = new Date(ts);
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    }
+  function formatDate(ts) {
+    if (!ts) return '-';
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
 
-    function getProgressText(data) {
-        if (!data || !data.testProgress) return '未开始';
-        const count = Object.values(data.testProgress).filter(p => p.completed).length;
-        if (count === 0) return '未开始';
-        if (count === 4) return '✅ 已完成';
-        return `进行中 (${count}/4)`;
-    }
+  function getProgressText(data) {
+    if (!data || !data.testProgress) return '未开始';
+    const count = Object.values(data.testProgress).filter(p => p.completed).length;
+    if (count === 0) return '未开始';
+    if (count === 4) return '✅ 已完成';
+    return `进行中 (${count}/4)`;
+  }
 
-    function getTotalScore(data) {
-        if (!data || !data.testResults) return '-';
-        const dims = ['planning', 'attention', 'simultaneous', 'successive'];
-        const scores = dims.map(d => data.testResults[d]?.totalScore || 0);
-        const total = scores.reduce((a, b) => a + b, 0);
-        return total > 0 ? total : '-';
-    }
+  function getTotalScore(data) {
+    if (!data || !data.testResults) return '-';
+    const dims = ['planning', 'attention', 'simultaneous', 'successive'];
+    const scores = dims.map(d => data.testResults[d]?.totalScore || 0);
+    const total = scores.reduce((a, b) => a + b, 0);
+    return total > 0 ? total : '-';
+  }
 
-    // 准备用户数据详情
-    const usersWithData = users.map((u, i) => {
-        const data = userManager.getUserData(u.id);
-        return {
-            ...u,
-            avatar: getAvatar(i),
-            data,
-            progress: getProgressText(data),
-            totalScore: getTotalScore(data)
-        };
-    });
+  // 准备用户数据详情
+  const usersWithData = users.map((u, i) => {
+    const data = userManager.getUserData(u.id);
+    return {
+      ...u,
+      avatar: getAvatar(i),
+      data,
+      progress: getProgressText(data),
+      totalScore: getTotalScore(data)
+    };
+  });
 
-    app.innerHTML = `
+  app.innerHTML = `
     <div class="navbar">
       <a class="navbar-brand" href="#/login">
         <span class="navbar-brand-icon">🧠</span>
         <span>智趣认知乐园</span>
       </a>
-      <div class="navbar-actions">
+      <div class="navbar-actions" style="display:flex; align-items:center; gap:8px;">
         <span style="font-size:0.9rem; color:var(--text-secondary); margin-right:8px;">
           🔒 管理员模式
         </span>
+        <button id="btn-analytics" class="btn btn-secondary" style="padding:6px 14px; font-size:0.8rem;">📊 数据分析</button>
+        <button id="btn-export-excel" class="btn btn-secondary" style="padding:6px 14px; font-size:0.8rem;">📥 导出Excel</button>
+        <button id="btn-export-pdf" class="btn btn-secondary" style="padding:6px 14px; font-size:0.8rem;">📄 导出PDF</button>
+        <button id="btn-export-json" class="btn btn-secondary" style="padding:6px 14px; font-size:0.8rem;">💾 JSON</button>
         <button id="btn-exit-admin" class="btn btn-secondary" style="padding:8px 20px; font-size:0.85rem;">
           退出管理
         </button>
@@ -144,37 +150,63 @@ export function renderAdmin(app) {
     </div>
   `;
 
-    // 退出管理员
-    document.getElementById('btn-exit-admin').addEventListener('click', () => {
-        router.navigate('/login');
+  // 退出管理员
+  document.getElementById('btn-exit-admin').addEventListener('click', () => {
+    router.navigate('/login');
+  });
+
+  // 数据分析
+  document.getElementById('btn-analytics').addEventListener('click', () => {
+    router.navigate('/admin/analytics');
+  });
+
+  // 导出 Excel
+  document.getElementById('btn-export-excel').addEventListener('click', () => {
+    const allData = users.map(u => userManager.getUserData(u.id) || {});
+    exportUsersToExcel(allData);
+  });
+
+  // 导出 PDF
+  document.getElementById('btn-export-pdf').addEventListener('click', () => {
+    const allData = users.map(u => userManager.getUserData(u.id) || {});
+    generateClassReportPDF(allData);
+  });
+
+  // 导出 JSON
+  document.getElementById('btn-export-json').addEventListener('click', () => {
+    const allData = users.map(u => ({
+      user: u,
+      ...userManager.getUserData(u.id)
+    }));
+    exportToJSON(allData, `测评数据_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.json`);
+  });
+
+  // 查看详情
+  let currentDetailUserId = null;
+  document.querySelectorAll('.btn-mini-view').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const userId = btn.dataset.viewId;
+      currentDetailUserId = userId;
+      showDetail(userId);
     });
+  });
 
-    // 查看详情
-    let currentDetailUserId = null;
-    document.querySelectorAll('.btn-mini-view').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const userId = btn.dataset.viewId;
-            currentDetailUserId = userId;
-            showDetail(userId);
-        });
-    });
+  function showDetail(userId) {
+    const user = users.find(u => u.id === userId);
+    const data = userManager.getUserData(userId);
+    const detailBody = document.getElementById('detail-body');
 
-    function showDetail(userId) {
-        const user = users.find(u => u.id === userId);
-        const data = userManager.getUserData(userId);
-        const detailBody = document.getElementById('detail-body');
+    if (!user) return;
 
-        if (!user) return;
+    const dims = [
+      { key: 'planning', name: '计划能力', icon: '🎯', color: '#6C5CE7' },
+      { key: 'attention', name: '注意过程', icon: '👁️', color: '#E17055' },
+      { key: 'simultaneous', name: '同时性加工', icon: '🧩', color: '#00CEC9' },
+      { key: 'successive', name: '继时性加工', icon: '🔗', color: '#FD79A8' }
+    ];
 
-        const dims = [
-            { key: 'planning', name: '计划能力', icon: '🎯', color: '#6C5CE7' },
-            { key: 'attention', name: '注意过程', icon: '👁️', color: '#E17055' },
-            { key: 'simultaneous', name: '同时性加工', icon: '🧩', color: '#00CEC9' },
-            { key: 'successive', name: '继时性加工', icon: '🔗', color: '#FD79A8' }
-        ];
-
-        detailBody.innerHTML = `
+    detailBody.innerHTML = `
       <div style="text-align:center; margin-bottom:20px;">
         <div style="font-size:2.5rem; margin-bottom:8px;">${getAvatar(users.indexOf(user))}</div>
         <h3 style="font-weight:800; color:var(--text-primary);">${user.name}</h3>
@@ -182,11 +214,11 @@ export function renderAdmin(app) {
       </div>
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
         ${dims.map(dim => {
-            const prog = data?.testProgress?.[dim.key];
-            const result = data?.testResults?.[dim.key];
-            const completedSubs = prog ? prog.subTests.filter(Boolean).length : 0;
-            const score = result ? result.totalScore : 0;
-            return `
+      const prog = data?.testProgress?.[dim.key];
+      const result = data?.testResults?.[dim.key];
+      const completedSubs = prog ? prog.subTests.filter(Boolean).length : 0;
+      const score = result ? result.totalScore : 0;
+      return `
             <div style="
               background: ${dim.color}10;
               border: 2px solid ${dim.color}30;
@@ -200,57 +232,57 @@ export function renderAdmin(app) {
               <div style="font-size:0.75rem; color:var(--text-light);">子测试 ${completedSubs}/3</div>
             </div>
           `;
-        }).join('')}
+    }).join('')}
       </div>
       <div style="text-align:center; margin-top:20px;">
         <button id="btn-detail-close" class="btn btn-secondary" style="min-width:120px;">关闭</button>
       </div>
     `;
 
-        document.getElementById('detail-modal').style.display = 'flex';
-        document.getElementById('btn-detail-close').addEventListener('click', () => {
-            document.getElementById('detail-modal').style.display = 'none';
-        });
+    document.getElementById('detail-modal').style.display = 'flex';
+    document.getElementById('btn-detail-close').addEventListener('click', () => {
+      document.getElementById('detail-modal').style.display = 'none';
+    });
+  }
+
+  // 删除用户
+  let deleteUserId = null;
+  const deleteModal = document.getElementById('delete-modal');
+
+  document.querySelectorAll('.btn-mini-delete').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteUserId = btn.dataset.deleteId;
+      document.getElementById('delete-name').textContent = btn.dataset.deleteName;
+      deleteModal.style.display = 'flex';
+    });
+  });
+
+  document.getElementById('btn-delete-cancel').addEventListener('click', () => {
+    deleteModal.style.display = 'none';
+    deleteUserId = null;
+  });
+
+  document.getElementById('btn-delete-confirm').addEventListener('click', () => {
+    if (deleteUserId) {
+      userManager.deleteUser(deleteUserId);
+      deleteModal.style.display = 'none';
+      // 重新渲染页面
+      renderAdmin(app);
     }
+  });
 
-    // 删除用户
-    let deleteUserId = null;
-    const deleteModal = document.getElementById('delete-modal');
+  // 点击遮罩关闭弹窗
+  document.getElementById('detail-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'detail-modal') {
+      e.target.style.display = 'none';
+    }
+  });
 
-    document.querySelectorAll('.btn-mini-delete').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            deleteUserId = btn.dataset.deleteId;
-            document.getElementById('delete-name').textContent = btn.dataset.deleteName;
-            deleteModal.style.display = 'flex';
-        });
-    });
-
-    document.getElementById('btn-delete-cancel').addEventListener('click', () => {
-        deleteModal.style.display = 'none';
-        deleteUserId = null;
-    });
-
-    document.getElementById('btn-delete-confirm').addEventListener('click', () => {
-        if (deleteUserId) {
-            userManager.deleteUser(deleteUserId);
-            deleteModal.style.display = 'none';
-            // 重新渲染页面
-            renderAdmin(app);
-        }
-    });
-
-    // 点击遮罩关闭弹窗
-    document.getElementById('detail-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'detail-modal') {
-            e.target.style.display = 'none';
-        }
-    });
-
-    deleteModal.addEventListener('click', (e) => {
-        if (e.target === deleteModal) {
-            deleteModal.style.display = 'none';
-            deleteUserId = null;
-        }
-    });
+  deleteModal.addEventListener('click', (e) => {
+    if (e.target === deleteModal) {
+      deleteModal.style.display = 'none';
+      deleteUserId = null;
+    }
+  });
 }

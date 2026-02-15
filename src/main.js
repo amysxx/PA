@@ -13,6 +13,8 @@ import { renderAttention } from './pages/tests/attention.js';
 import { renderSimultaneous } from './pages/tests/simultaneous.js';
 import { renderSuccessive } from './pages/tests/successive.js';
 import { renderReport } from './pages/report.js';
+import { renderHistory } from './pages/history.js';
+import { renderAdminAnalytics } from './pages/adminAnalytics.js';
 
 // 迁移旧版单用户数据
 userManager.migrateOldData();
@@ -28,7 +30,9 @@ router
     .register('/test/attention', renderAttention)
     .register('/test/simultaneous', renderSimultaneous)
     .register('/test/successive', renderSuccessive)
-    .register('/report', renderReport);
+    .register('/report', renderReport)
+    .register('/history', renderHistory)
+    .register('/admin/analytics', renderAdminAnalytics);
 
 // 启动
 router.start();

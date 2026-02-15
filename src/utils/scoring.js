@@ -13,6 +13,20 @@ const AGE_DIFFICULTY = {
 };
 
 /**
+ * 维度特异性权重
+ * planning: 偏重策略（准确度60%，速度40%）
+ * attention: 平衡型（各50%）
+ * simultaneous: 偏重理解（准确度75%，速度25%）
+ * successive: 偏重记忆（准确度70%，速度30%）
+ */
+const DIMENSION_WEIGHTS = {
+    'planning': { accuracy: 0.6, speed: 0.4 },
+    'attention': { accuracy: 0.5, speed: 0.5 },
+    'simultaneous': { accuracy: 0.75, speed: 0.25 },
+    'successive': { accuracy: 0.7, speed: 0.3 }
+};
+
+/**
  * 计算子测试得分（满分约33分，三个子测试加起来约100分）
  * @param {number} correctRate - 正确率 0-1
  * @param {number} avgReactionTime - 平均反应时间 ms
@@ -22,15 +36,19 @@ const AGE_DIFFICULTY = {
  */
 export function calculateScore(correctRate, avgReactionTime, ageGroup, testType) {
     const difficultyFactor = AGE_DIFFICULTY[ageGroup] || 1.0;
+    const weights = DIMENSION_WEIGHTS[testType] || { accuracy: 0.7, speed: 0.3 };
 
-    // 基础分：由正确率决定（占70%权重）
-    const accuracyScore = correctRate * 23 * difficultyFactor;
+    // 满分33分按权重拆分
+    const maxAccuracyScore = 33 * weights.accuracy;
+    const maxSpeedScore = 33 * weights.speed;
 
-    // 速度分：由反应时间决定（占30%权重）
-    // 基准反应时间根据测试类型不同
+    // 基础分：由正确率决定
+    const accuracyScore = correctRate * maxAccuracyScore * difficultyFactor;
+
+    // 速度分：由反应时间决定
     const baseRT = getBaseReactionTime(testType, ageGroup);
     const speedRatio = Math.max(0, Math.min(2, baseRT / Math.max(avgReactionTime, 200)));
-    const speedScore = speedRatio * 5 * difficultyFactor;
+    const speedScore = speedRatio * maxSpeedScore * difficultyFactor / 2;
 
     // 总分，上限33
     return Math.min(33, Math.round((accuracyScore + speedScore) * 10) / 10);
@@ -55,13 +73,30 @@ function getBaseReactionTime(testType, ageGroup) {
 
 /**
  * 获取得分等级和描述
+ * 基于百分比计算等级（满分为100分 = 4个子维度各33分 × 3）
  */
 export function getScoreLevel(score) {
-    if (score >= 90) return { level: '优秀', color: '#00B894', emoji: '🌟', desc: '表现非常出色' };
-    if (score >= 75) return { level: '良好', color: '#6C5CE7', emoji: '👍', desc: '表现良好' };
-    if (score >= 60) return { level: '中等', color: '#FDCB6E', emoji: '💪', desc: '表现一般，可以继续加油' };
-    if (score >= 40) return { level: '待提高', color: '#E17055', emoji: '📚', desc: '需要更多练习' };
-    return { level: '需加强', color: '#FF7675', emoji: '❤️', desc: '建议多方面训练提升' };
+    // 使用百分比来划分等级（满分100）
+    const percentage = (score / 100) * 100;
+    if (percentage >= 90) return { level: '优秀', color: '#00B894', emoji: '🌟', desc: '表现非常出色' };
+    if (percentage >= 80) return { level: '良好', color: '#6C5CE7', emoji: '👍', desc: '表现良好' };
+    if (percentage >= 70) return { level: '中等', color: '#00CEC9', emoji: '💪', desc: '表现不错，继续加油' };
+    if (percentage >= 60) return { level: '待提高', color: '#FDCB6E', emoji: '📚', desc: '还有提升空间' };
+    if (percentage >= 40) return { level: '需加强', color: '#E17055', emoji: '💡', desc: '需要更多练习和训练' };
+    return { level: '需关注', color: '#FF7675', emoji: '❤️', desc: '建议寻求专业指导' };
+}
+
+/**
+ * 获取单个维度的得分等级（满分33分）
+ */
+export function getDimensionLevel(score) {
+    const percentage = (score / 33) * 100;
+    if (percentage >= 90) return { level: '优秀', color: '#00B894', emoji: '🌟', desc: '表现非常出色' };
+    if (percentage >= 80) return { level: '良好', color: '#6C5CE7', emoji: '👍', desc: '表现良好' };
+    if (percentage >= 70) return { level: '中等', color: '#00CEC9', emoji: '💪', desc: '表现不错' };
+    if (percentage >= 60) return { level: '待提高', color: '#FDCB6E', emoji: '📚', desc: '还有提升空间' };
+    if (percentage >= 40) return { level: '需加强', color: '#E17055', emoji: '💡', desc: '需要更多练习' };
+    return { level: '需关注', color: '#FF7675', emoji: '❤️', desc: '建议针对性训练' };
 }
 
 /**

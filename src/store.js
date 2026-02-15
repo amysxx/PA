@@ -2,6 +2,7 @@
  * 全局状态管理（多用户版，含 LocalStorage 持久化）
  */
 import { userManager } from './userManager.js';
+import { saveTestHistory } from './utils/dataHistory.js';
 
 const defaultState = {
     user: {
@@ -116,6 +117,28 @@ class Store {
             const total = this.state.testResults[d].totalScore;
             return Math.min(Math.round(total), maxPerDim);
         });
+    }
+
+    /**
+     * 将当前测评结果保存到历史记录
+     * 应在所有维度测试完成后调用
+     */
+    saveCurrentTestToHistory() {
+        const userId = userManager.getCurrentUserId();
+        if (!userId) return null;
+
+        const duration = this.state.startTime
+            ? Date.now() - this.state.startTime
+            : 0;
+
+        const record = saveTestHistory(
+            userId,
+            this.state.testResults,
+            this.state.user.ageGroup,
+            duration
+        );
+
+        return record;
     }
 
     /**

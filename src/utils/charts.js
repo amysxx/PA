@@ -192,3 +192,189 @@ export function drawBarChart(canvas, data, labels, options = {}) {
         ctx.fillText(labels[i] || '', x + barWidth / 2, height - padding + 18);
     });
 }
+
+/**
+ * 绘制折线图（用于趋势追踪）
+ */
+export function drawLineChart(canvas, datasets, options = {}) {
+    const {
+        width = 400,
+        height = 200,
+        maxValue = 100,
+        showDots = true,
+        showLabels = true
+    } = options;
+
+    canvas.width = width * 2;
+    canvas.height = height * 2;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(2, 2);
+
+    const padding = { top: 20, right: 20, bottom: 35, left: 40 };
+    const chartW = width - padding.left - padding.right;
+    const chartH = height - padding.top - padding.bottom;
+
+    // 背景网格线
+    ctx.strokeStyle = '#E8E5F3';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 4; i++) {
+        const y = padding.top + (chartH * i) / 4;
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(width - padding.right, y);
+        ctx.stroke();
+
+        ctx.font = '9px "Nunito", sans-serif';
+        ctx.fillStyle = '#B2BEC3';
+        ctx.textAlign = 'right';
+        ctx.fillText(Math.round(maxValue - (maxValue * i) / 4).toString(), padding.left - 5, y + 3);
+    }
+
+    // 绘制每条数据线
+    datasets.forEach(ds => {
+        const { data, color = '#6C5CE7', labels: lbs = [] } = ds;
+        if (data.length < 2) return;
+
+        const step = chartW / (data.length - 1);
+
+        // 绘制线
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round';
+        data.forEach((val, i) => {
+            const x = padding.left + i * step;
+            const y = padding.top + chartH - (val / maxValue) * chartH;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+        // 绘制填充渐变
+        ctx.beginPath();
+        data.forEach((val, i) => {
+            const x = padding.left + i * step;
+            const y = padding.top + chartH - (val / maxValue) * chartH;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.lineTo(padding.left + (data.length - 1) * step, padding.top + chartH);
+        ctx.lineTo(padding.left, padding.top + chartH);
+        ctx.closePath();
+        const grad = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartH);
+        grad.addColorStop(0, color + '30');
+        grad.addColorStop(1, color + '05');
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // 绘制数据点
+        if (showDots) {
+            data.forEach((val, i) => {
+                const x = padding.left + i * step;
+                const y = padding.top + chartH - (val / maxValue) * chartH;
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+        }
+
+        // X轴标签
+        if (showLabels && lbs.length > 0) {
+            ctx.font = '9px "Noto Sans SC", sans-serif';
+            ctx.fillStyle = '#636E72';
+            ctx.textAlign = 'center';
+            lbs.forEach((label, i) => {
+                const x = padding.left + i * step;
+                ctx.fillText(label, x, height - 8);
+            });
+        }
+    });
+}
+
+/**
+ * 绘制饼图（用于维度占比）
+ */
+export function drawPieChart(canvas, data, labels, options = {}) {
+    const {
+        size = 200,
+        colors = ['#6C5CE7', '#E17055', '#00CEC9', '#FD79A8'],
+        showLabels = true,
+        showPercentage = true
+    } = options;
+
+    canvas.width = size * 2;
+    canvas.height = size * 2;
+    canvas.style.width = size + 'px';
+    canvas.style.height = size + 'px';
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(2, 2);
+
+    const center = size / 2;
+    const radius = size / 2 - 30;
+    const total = data.reduce((a, b) => a + b, 0);
+    if (total === 0) return;
+
+    let startAngle = -Math.PI / 2;
+
+    data.forEach((val, i) => {
+        const sliceAngle = (val / total) * Math.PI * 2;
+
+        // 绘制扇区
+        ctx.beginPath();
+        ctx.moveTo(center, center);
+        ctx.arc(center, center, radius, startAngle, startAngle + sliceAngle);
+        ctx.closePath();
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 绘制标签
+        if (showLabels && labels && labels[i]) {
+            const midAngle = startAngle + sliceAngle / 2;
+            const labelR = radius * 0.65;
+            const lx = center + labelR * Math.cos(midAngle);
+            const ly = center + labelR * Math.sin(midAngle);
+
+            ctx.font = 'bold 10px "Noto Sans SC", sans-serif';
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            if (showPercentage) {
+                const pct = Math.round((val / total) * 100);
+                ctx.fillText(`${pct}%`, lx, ly);
+            }
+        }
+
+        startAngle += sliceAngle;
+    });
+
+    // 外部标签
+    if (showLabels && labels) {
+        startAngle = -Math.PI / 2;
+        data.forEach((val, i) => {
+            const sliceAngle = (val / total) * Math.PI * 2;
+            const midAngle = startAngle + sliceAngle / 2;
+            const outerR = radius + 18;
+            const ox = center + outerR * Math.cos(midAngle);
+            const oy = center + outerR * Math.sin(midAngle);
+
+            ctx.font = '10px "Noto Sans SC", sans-serif';
+            ctx.fillStyle = colors[i % colors.length];
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(labels[i] || '', ox, oy);
+            startAngle += sliceAngle;
+        });
+    }
+}
