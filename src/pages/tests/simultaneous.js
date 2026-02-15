@@ -1,0 +1,460 @@
+/**
+ * 同时性加工测试模块
+ * 子测试1: 图形矩阵推理 — 根据图形关系完成矩阵
+ * 子测试2: 空间关系 — 判断图形的空间位置关系
+ * 子测试3: 词语关系 — 理解词语间的语义关系
+ */
+import { router } from '../../router.js';
+import { store } from '../../store.js';
+import { Timer, ReactionTimer } from '../../utils/timer.js';
+import { calculateScore } from '../../utils/scoring.js';
+
+let currentTimer = null;
+
+export function renderSimultaneous(app) {
+    const user = store.get('user');
+    if (!user.name) { router.navigate('/user-info'); return; }
+
+    const progress = store.get('testProgress.simultaneous');
+    let currentSub = progress.subTests.findIndex(s => !s);
+    if (currentSub === -1) currentSub = 0;
+    renderSubTest(app, currentSub);
+}
+
+function renderSubTest(app, subIndex) {
+    if (currentTimer) { currentTimer.stop(); currentTimer = null; }
+    switch (subIndex) {
+        case 0: renderMatrixReasoning(app); break;
+        case 1: renderSpatialRelation(app); break;
+        case 2: renderWordRelation(app); break;
+        default: router.navigate('/test-select');
+    }
+}
+
+/* ===== 子测试1: 图形矩阵推理 ===== */
+function renderMatrixReasoning(app) {
+    const diff = getDifficulty(store.get('user.ageGroup'));
+    const questions = generateMatrixQuestions(diff.matrixCount);
+    let currentQ = 0;
+    let correct = 0;
+    const reactionTimer = new ReactionTimer();
+    const timeLimit = diff.matrixTime;
+
+    function showQuestion() {
+        if (currentQ >= questions.length) {
+            currentTimer.stop();
+            finishSubTest(0, '图形矩阵推理', correct, questions.length, reactionTimer, 1);
+            return;
+        }
+        const q = questions[currentQ];
+        const contentEl = document.getElementById('test-inner-content');
+        if (!contentEl) return;
+
+        contentEl.innerHTML = `
+      <div style="font-size:0.85rem; color:var(--text-light); margin-bottom:12px;">第 ${currentQ + 1}/${questions.length} 题</div>
+      <div class="test-question">找出规律，选择缺少的图形</div>
+      <div style="
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        max-width: 240px;
+        margin: 0 auto 24px;
+      ">
+        ${q.matrix.map((cell, i) => `
+          <div style="
+            width: 72px; height: 72px;
+            border: 2px solid ${i === q.missingIndex ? 'var(--accent-pink)' : '#E8E5F3'};
+            border-radius: var(--radius-sm);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem;
+            background: ${i === q.missingIndex ? '#FFF0F5' : 'var(--bg-card)'};
+            ${i === q.missingIndex ? 'border-style: dashed;' : ''}
+          ">
+            ${i === q.missingIndex ? '❓' : cell}
+          </div>
+        `).join('')}
+      </div>
+      <div class="test-options" style="max-width:500px;">
+        ${q.options.map((opt, i) => `
+          <div class="test-option" data-idx="${i}" style="font-size:1.8rem; padding:14px;">${opt}</div>
+        `).join('')}
+      </div>
+    `;
+
+        reactionTimer.start();
+
+        contentEl.querySelectorAll('.test-option').forEach(opt => {
+            opt.addEventListener('click', () => {
+                const idx = parseInt(opt.dataset.idx);
+                if (idx === q.correctIndex) {
+                    correct++;
+                    opt.classList.add('correct');
+                } else {
+                    opt.classList.add('wrong');
+                    contentEl.querySelectorAll('.test-option').forEach(o => {
+                        if (parseInt(o.dataset.idx) === q.correctIndex) o.classList.add('correct');
+                    });
+                }
+                reactionTimer.record();
+                currentQ++;
+                setTimeout(showQuestion, 600);
+            });
+        });
+    }
+
+    renderTestShell(app, '同时性加工', '图形矩阵推理', '🧩', '根据规律推导缺失的图形',
+        'linear-gradient(135deg, #00CEC9, #55EFC4)', timeLimit,
+        (timerEl) => {
+            currentTimer = new Timer(timeLimit,
+                (rem) => {
+                    timerEl.innerHTML = `⏱️ ${currentTimer.getFormatted()}`;
+                    if (rem <= 10) timerEl.classList.add('warning');
+                },
+                () => finishSubTest(0, '图形矩阵推理', correct, currentQ || 1, reactionTimer, 1)
+            );
+            currentTimer.start();
+            showQuestion();
+        },
+        () => {
+            currentTimer.stop();
+            finishSubTest(0, '图形矩阵推理', correct, currentQ || 1, reactionTimer, 1);
+        }
+    );
+}
+
+/* ===== 子测试2: 空间关系 ===== */
+function renderSpatialRelation(app) {
+    const diff = getDifficulty(store.get('user.ageGroup'));
+    const questions = generateSpatialQuestions(diff.spatialCount);
+    let currentQ = 0;
+    let correct = 0;
+    const reactionTimer = new ReactionTimer();
+    const timeLimit = diff.spatialTime;
+
+    function showQuestion() {
+        if (currentQ >= questions.length) {
+            currentTimer.stop();
+            finishSubTest(1, '空间关系', correct, questions.length, reactionTimer, 2);
+            return;
+        }
+        const q = questions[currentQ];
+        const contentEl = document.getElementById('test-inner-content');
+        if (!contentEl) return;
+
+        contentEl.innerHTML = `
+      <div style="font-size:0.85rem; color:var(--text-light); margin-bottom:12px;">第 ${currentQ + 1}/${questions.length} 题</div>
+      <div class="test-question">${q.question}</div>
+      <div style="font-size:3rem; margin:16px 0; animation: popIn 0.3s ease;">${q.display}</div>
+      <div class="test-options" style="max-width:500px;">
+        ${q.options.map((opt, i) => `
+          <div class="test-option" data-idx="${i}">${opt}</div>
+        `).join('')}
+      </div>
+    `;
+
+        reactionTimer.start();
+
+        contentEl.querySelectorAll('.test-option').forEach(opt => {
+            opt.addEventListener('click', () => {
+                const idx = parseInt(opt.dataset.idx);
+                if (idx === q.correctIndex) {
+                    correct++;
+                    opt.classList.add('correct');
+                } else {
+                    opt.classList.add('wrong');
+                    contentEl.querySelectorAll('.test-option').forEach(o => {
+                        if (parseInt(o.dataset.idx) === q.correctIndex) o.classList.add('correct');
+                    });
+                }
+                reactionTimer.record();
+                currentQ++;
+                setTimeout(showQuestion, 600);
+            });
+        });
+    }
+
+    renderTestShell(app, '同时性加工', '空间关系', '📐', '判断图形之间的空间位置关系',
+        'linear-gradient(135deg, #00CEC9, #55EFC4)', timeLimit,
+        (timerEl) => {
+            currentTimer = new Timer(timeLimit,
+                (rem) => {
+                    timerEl.innerHTML = `⏱️ ${currentTimer.getFormatted()}`;
+                    if (rem <= 10) timerEl.classList.add('warning');
+                },
+                () => finishSubTest(1, '空间关系', correct, currentQ || 1, reactionTimer, 2)
+            );
+            currentTimer.start();
+            showQuestion();
+        },
+        () => {
+            currentTimer.stop();
+            finishSubTest(1, '空间关系', correct, currentQ || 1, reactionTimer, 2);
+        }
+    );
+}
+
+/* ===== 子测试3: 词语关系 ===== */
+function renderWordRelation(app) {
+    const diff = getDifficulty(store.get('user.ageGroup'));
+    const questions = generateWordQuestions(diff.wordCount, store.get('user.ageGroup'));
+    let currentQ = 0;
+    let correct = 0;
+    const reactionTimer = new ReactionTimer();
+    const timeLimit = diff.wordTime;
+
+    function showQuestion() {
+        if (currentQ >= questions.length) {
+            currentTimer.stop();
+            finishSubTest(2, '词语关系', correct, questions.length, reactionTimer, -1);
+            return;
+        }
+        const q = questions[currentQ];
+        const contentEl = document.getElementById('test-inner-content');
+        if (!contentEl) return;
+
+        contentEl.innerHTML = `
+      <div style="font-size:0.85rem; color:var(--text-light); margin-bottom:12px;">第 ${currentQ + 1}/${questions.length} 题</div>
+      <div class="test-question" style="line-height:1.8;">
+        ${q.question}
+      </div>
+      <div class="test-options" style="max-width:500px;">
+        ${q.options.map((opt, i) => `
+          <div class="test-option" data-idx="${i}">${opt}</div>
+        `).join('')}
+      </div>
+    `;
+
+        reactionTimer.start();
+
+        contentEl.querySelectorAll('.test-option').forEach(opt => {
+            opt.addEventListener('click', () => {
+                const idx = parseInt(opt.dataset.idx);
+                if (idx === q.correctIndex) {
+                    correct++;
+                    opt.classList.add('correct');
+                } else {
+                    opt.classList.add('wrong');
+                    contentEl.querySelectorAll('.test-option').forEach(o => {
+                        if (parseInt(o.dataset.idx) === q.correctIndex) o.classList.add('correct');
+                    });
+                }
+                reactionTimer.record();
+                currentQ++;
+                setTimeout(showQuestion, 600);
+            });
+        });
+    }
+
+    renderTestShell(app, '同时性加工', '词语关系', '📝', '理解词语之间的语义关系',
+        'linear-gradient(135deg, #00CEC9, #55EFC4)', timeLimit,
+        (timerEl) => {
+            currentTimer = new Timer(timeLimit,
+                (rem) => {
+                    timerEl.innerHTML = `⏱️ ${currentTimer.getFormatted()}`;
+                    if (rem <= 10) timerEl.classList.add('warning');
+                },
+                () => finishSubTest(2, '词语关系', correct, currentQ || 1, reactionTimer, -1)
+            );
+            currentTimer.start();
+            showQuestion();
+        },
+        () => {
+            currentTimer.stop();
+            finishSubTest(2, '词语关系', correct, currentQ || 1, reactionTimer, -1);
+        }
+    );
+}
+
+/* ===== 通用测试外壳 ===== */
+function renderTestShell(app, dimension, subName, icon, subtitle, bgGrad, timeLimit, onReady, onSkip) {
+    app.innerHTML = `
+    <div class="navbar">
+      <a class="navbar-brand" href="#/test-select">
+        <span class="navbar-brand-icon">🧠</span>
+        <span>智趣认知乐园</span>
+      </a>
+    </div>
+    <div class="page has-navbar">
+      <div class="container">
+        <div class="test-header">
+          <div class="test-header-left">
+            <div class="test-header-icon" style="background:${bgGrad};">${icon}</div>
+            <div>
+              <div class="test-header-title">${dimension} · ${subName}</div>
+              <div class="test-header-subtitle">${subtitle}</div>
+            </div>
+          </div>
+          <div class="test-timer" id="timer">⏱️ ${Math.floor(timeLimit / 60)}:${(timeLimit % 60).toString().padStart(2, '0')}</div>
+        </div>
+        <div class="test-content" id="test-inner-content"></div>
+        <div class="test-footer">
+          <button class="btn btn-secondary" id="btn-skip">跳过此项 →</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+    const timerEl = document.getElementById('timer');
+    onReady(timerEl);
+    document.getElementById('btn-skip')?.addEventListener('click', onSkip);
+}
+
+/* ===== 通用完成处理 ===== */
+function finishSubTest(subIndex, name, correct, total, reactionTimer, nextSub) {
+    const correctRate = correct / Math.max(total, 1);
+    const avgRT = reactionTimer.getAverage() || 5000;
+    const score = calculateScore(correctRate, avgRT, store.get('user.ageGroup'), 'simultaneous');
+
+    store.setTestResult('simultaneous', subIndex, score, {
+        name, correct, total,
+        correctRate: Math.round(correctRate * 100),
+        avgReactionTime: Math.round(avgRT)
+    });
+
+    showResult(score, name, correct, total, nextSub);
+}
+
+function showResult(score, testName, achieved, total, nextSubIndex) {
+    const app = document.getElementById('app');
+    const levelInfo = getQuickLevel(score);
+
+    app.innerHTML = `
+    <div class="page page-center" style="min-height:100vh;">
+      <div class="modal" style="max-width:480px; animation: scaleIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);">
+        <div class="modal-icon">${levelInfo.emoji}</div>
+        <div class="modal-title">${testName} 完成！</div>
+        <div style="font-family:var(--font-display); font-size:3rem; font-weight:900; color:${levelInfo.color}; margin:12px 0;">${Math.round(score)}分</div>
+        <div class="modal-text">正确: ${achieved}/${total} · 评级: <strong style="color:${levelInfo.color}">${levelInfo.level}</strong></div>
+        <div class="modal-actions">
+          ${nextSubIndex >= 0 && nextSubIndex <= 2 ? `
+            <button class="btn btn-primary" id="btn-next">继续下一项 →</button>
+          ` : `
+            <button class="btn btn-primary" id="btn-back">返回选择 ✓</button>
+          `}
+        </div>
+      </div>
+    </div>
+  `;
+
+    if (nextSubIndex >= 0 && nextSubIndex <= 2) {
+        document.getElementById('btn-next').addEventListener('click', () => renderSubTest(app, nextSubIndex));
+    } else {
+        document.getElementById('btn-back').addEventListener('click', () => router.navigate('/test-select'));
+    }
+}
+
+/* ===== 题目生成器 ===== */
+function generateMatrixQuestions(count) {
+    // 图形模式推理
+    const patterns = [
+        { shapes: ['🔴', '🔵', '🟢'], rule: 'row-color' },
+        { shapes: ['⬛', '⬜', '🟫'], rule: 'row-shade' },
+        { shapes: ['▲', '■', '●'], rule: 'row-shape' },
+        { shapes: ['🌙', '⭐', '☀️'], rule: 'row-sky' },
+        { shapes: ['🍎', '🍊', '🍋'], rule: 'row-fruit' },
+        { shapes: ['🐱', '🐶', '🐰'], rule: 'row-animal' },
+        { shapes: ['❤️', '💛', '💙'], rule: 'row-heart' },
+        { shapes: ['🌲', '🌻', '🍄'], rule: 'row-nature' },
+    ];
+
+    const questions = [];
+    for (let q = 0; q < count; q++) {
+        const pattern = patterns[q % patterns.length];
+        const matrix = [];
+        // 每行一种图案
+        for (let r = 0; r < 3; r++) {
+            for (let c = 0; c < 3; c++) {
+                matrix.push(pattern.shapes[(r + c) % 3]);
+            }
+        }
+
+        const missingIndex = Math.floor(Math.random() * 3) + 6; // 最后一行的某个位置
+        const correctAnswer = matrix[missingIndex];
+
+        // 选项
+        const options = [...pattern.shapes];
+        // 随机加入干扰项
+        const allShapes = ['🔴', '🔵', '🟢', '⬛', '⬜', '▲', '■', '●', '🌙', '⭐'];
+        while (options.length < 4) {
+            const randShape = allShapes[Math.floor(Math.random() * allShapes.length)];
+            if (!options.includes(randShape)) options.push(randShape);
+        }
+
+        // 打乱选项
+        const shuffled = options.sort(() => Math.random() - 0.5);
+        const correctIndex = shuffled.indexOf(correctAnswer);
+
+        questions.push({ matrix, missingIndex, options: shuffled, correctIndex });
+    }
+    return questions;
+}
+
+function generateSpatialQuestions(count) {
+    const templates = [
+        { question: '下面哪个图形是旋转后的结果？', display: '🔺', options: ['🔻', '🔺', '◀️', '▶️'], correctIndex: 0 },
+        { question: '哪个图形在左边？', display: '⬅️ 🔵 🔴', options: ['🔵', '🔴', '都不是', '一样远'], correctIndex: 0 },
+        { question: '🟡在🔵的什么方向？', display: '🔵\n🟡', options: ['上面', '下面', '左边', '右边'], correctIndex: 1 },
+        { question: '下列哪组是对称图形？', display: '🦋', options: ['🦋', '🐌', '🦀', '🐠'], correctIndex: 0 },
+        { question: '🔺和 🔻 是什么关系？', display: '🔺 🔻', options: ['上下翻转', '左右翻转', '旋转90°', '完全相同'], correctIndex: 0 },
+        { question: '哪个图形最大？', display: '● ⬤ •', options: ['第一个', '第二个', '第三个', '一样大'], correctIndex: 1 },
+        { question: '下面哪个能拼组成正方形？', display: '◤ + ?', options: ['◢', '◣', '◥', '▲'], correctIndex: 0 },
+        { question: '镜像翻转后，箭头指向哪？', display: '→', options: ['←', '→', '↑', '↓'], correctIndex: 0 },
+        { question: '🟢在🔴和🔵之间属于什么位置？', display: '🔴 🟢 🔵', options: ['居中', '偏左', '偏右', '不确定'], correctIndex: 0 },
+        { question: '下面哪个形状有4条边？', display: '❓', options: ['◆', '▲', '●', '⬟'], correctIndex: 0 }
+    ];
+
+    const questions = [];
+    for (let i = 0; i < count; i++) {
+        questions.push(templates[i % templates.length]);
+    }
+    return questions;
+}
+
+function generateWordQuestions(count, ageGroup) {
+    const easyQuestions = [
+        { question: '"猫" 和 "狗" 属于什么关系？', options: ['同类关系', '反义关系', '因果关系', '包含关系'], correctIndex: 0 },
+        { question: '"苹果" 对 "水果"，就像 "玫瑰" 对 ___', options: ['花', '红色', '美丽', '树'], correctIndex: 0 },
+        { question: '"高" 和 "矮" 是什么关系？', options: ['同义词', '反义词', '近义词', '同类词'], correctIndex: 1 },
+        { question: '"眼睛" 对 "看"，就像 "耳朵" 对 ___', options: ['听', '说', '鼻子', '脸'], correctIndex: 0 },
+        { question: '哪个词和 "快乐" 意思最接近？', options: ['高兴', '悲伤', '生气', '害怕'], correctIndex: 0 },
+        { question: '"春天" 对 "温暖"，就像 "冬天" 对 ___', options: ['寒冷', '炎热', '凉爽', '温暖'], correctIndex: 0 },
+    ];
+
+    const hardQuestions = [
+        { question: '"医生" 对 "医院"，就像 "老师" 对 ___', options: ['学校', '公司', '工厂', '商店'], correctIndex: 0 },
+        { question: '以下哪组词的关系与 "画笔 : 画家" 最相似？', options: ['锤子 : 工人', '书本 : 学生', '食物 : 厨师', '歌曲 : 歌手'], correctIndex: 0 },
+        { question: '"勇敢" 和 "胆怯" 的关系最像 ___', options: ['光明与黑暗', '聪明与智慧', '高大与强壮', '美丽与漂亮'], correctIndex: 0 },
+        { question: '下面哪个词不属于同一类？', options: ['钢琴', '小提琴', '画笔', '吉他'], correctIndex: 2 },
+        { question: '"因为…所以…" 表达的是什么关系？', options: ['因果关系', '转折关系', '并列关系', '递进关系'], correctIndex: 0 },
+        { question: '"蜂蜜" 对 "甜"，就像 "柠檬" 对 ___', options: ['酸', '苦', '辣', '咸'], correctIndex: 0 },
+        { question: '下列哪个是 "知识" 的上位概念？', options: ['信息', '书本', '学校', '考试'], correctIndex: 0 },
+        { question: '"树干" 对 "树"，就像 "轮子" 对 ___', options: ['汽车', '道路', '速度', '橡胶'], correctIndex: 0 },
+    ];
+
+    const isYoung = ['幼儿组', '小学低年级组'].includes(ageGroup);
+    const pool = isYoung ? easyQuestions : [...easyQuestions, ...hardQuestions];
+
+    const questions = [];
+    for (let i = 0; i < count; i++) {
+        questions.push(pool[i % pool.length]);
+    }
+    return questions;
+}
+
+function getDifficulty(ageGroup) {
+    const configs = {
+        '幼儿组': { matrixCount: 5, matrixTime: 60, spatialCount: 5, spatialTime: 60, wordCount: 5, wordTime: 60 },
+        '小学低年级组': { matrixCount: 6, matrixTime: 55, spatialCount: 6, spatialTime: 55, wordCount: 6, wordTime: 55 },
+        '小学高年级组': { matrixCount: 8, matrixTime: 55, spatialCount: 7, spatialTime: 50, wordCount: 7, wordTime: 50 },
+        '初中组': { matrixCount: 9, matrixTime: 50, spatialCount: 8, spatialTime: 48, wordCount: 8, wordTime: 48 },
+        '高中组': { matrixCount: 10, matrixTime: 45, spatialCount: 10, spatialTime: 45, wordCount: 10, wordTime: 45 }
+    };
+    return configs[ageGroup] || configs['小学高年级组'];
+}
+
+function getQuickLevel(score) {
+    if (score >= 28) return { level: '优秀', color: '#00B894', emoji: '🌟' };
+    if (score >= 22) return { level: '良好', color: '#6C5CE7', emoji: '👍' };
+    if (score >= 15) return { level: '中等', color: '#FDCB6E', emoji: '💪' };
+    return { level: '继续加油', color: '#E17055', emoji: '📚' };
+}

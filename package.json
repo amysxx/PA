@@ -1,0 +1,45 @@
+{
+  "name": "pass-child-assessment",
+  "private": true,
+  "version": "1.0.0",
+  "description": "基于PASS理论的儿童青少年认知力测评软件",
+  "main": "electron-main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "electron:dev": "vite build && electron .",
+    "build:mac": "vite build && electron-builder --mac",
+    "build:win": "vite build && electron-builder --win"
+  },
+  "build": {
+    "appId": "com.pass.child-assessment",
+    "productName": "智趣认知乐园",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron-main.js"
+    ],
+    "mac": {
+      "category": "public.app-category.education",
+      "target": [
+        "dmg"
+      ],
+      "icon": "build/icon.png"
+    },
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "build/icon.png"
+    }
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "vite": "^2.9.16"
+  }
+}

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6C5CE7"/>
+      <stop offset="50%" style="stop-color:#A29BFE"/>
+      <stop offset="100%" style="stop-color:#74B9FF"/>
+    </linearGradient>
+    <linearGradient id="brain" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF"/>
+      <stop offset="100%" style="stop-color:#E8E5F3"/>
+    </linearGradient>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="245" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="220" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="3"/>
+  <!-- Brain icon -->
+  <g transform="translate(256,260) scale(3.2)" fill="url(#brain)">
+    <path d="M-20,-35 C-35,-35 -45,-20 -45,-5 C-45,0 -43,5 -40,8 C-45,12 -48,20 -45,28 C-42,38 -30,42 -20,40 C-15,45 -5,48 5,45 C10,48 20,45 25,40 C35,42 45,35 45,25 C45,18 42,12 38,8 C42,3 45,-5 43,-12 C40,-22 30,-30 20,-35 C15,-38 5,-40 0,-38 C-5,-40 -15,-38 -20,-35Z"/>
+    <path d="M0,-38 L0,45" fill="none" stroke="#6C5CE7" stroke-width="2" opacity="0.6"/>
+    <path d="M-30,-10 Q-15,-5 0,-15 Q15,-5 30,-10" fill="none" stroke="#6C5CE7" stroke-width="1.5" opacity="0.4"/>
+    <path d="M-25,15 Q-10,20 0,10 Q10,20 25,15" fill="none" stroke="#6C5CE7" stroke-width="1.5" opacity="0.4"/>
+  </g>
+  <!-- Stars -->
+  <circle cx="130" cy="120" r="6" fill="#FDCB6E" opacity="0.9"/>
+  <circle cx="380" cy="140" r="4" fill="#55EFC4" opacity="0.9"/>
+  <circle cx="100" cy="350" r="5" fill="#FD79A8" opacity="0.9"/>
+  <circle cx="400" cy="380" r="7" fill="#FDCB6E" opacity="0.9"/>
+  <circle cx="350" cy="100" r="3" fill="#FF7675" opacity="0.8"/>
+  <!-- Sparkles -->
+  <text x="160" y="100" font-size="24" opacity="0.7">✨</text>
+  <text x="340" y="400" font-size="20" opacity="0.7">⭐</text>
+  <text x="390" y="180" font-size="16" opacity="0.6">✨</text>
+</svg>
