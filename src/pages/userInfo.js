@@ -34,15 +34,22 @@ export function renderUserInfo(app) {
           </div>
 
           <div class="form-group">
-            <label class="form-label">🎂 你的年龄</label>
-            <input type="number" class="form-input" id="input-age" placeholder="请输入年龄（5-17岁）" value="${user.age || ''}" min="5" max="17" />
-            <div id="age-group-display" style="
+            <label class="form-label">🎂 出生年月日</label>
+            <input type="date" class="form-input" id="input-birthdate" value="${user.birthDate || ''}" />
+            <div id="age-display" style="
               margin-top: 8px;
               font-size: 0.9rem;
               font-weight: 700;
               color: var(--primary);
-              display: ${user.age ? 'block' : 'none'};
-            ">${user.age ? '📌 你属于：' + store.getAgeGroup(user.age) : ''}</div>
+              display: none;
+            "></div>
+            <div id="age-group-display" style="
+              margin-top: 4px;
+              font-size: 0.85rem;
+              font-weight: 600;
+              color: var(--secondary);
+              display: none;
+            "></div>
             <div id="age-error" class="form-error" style="display:none;"></div>
           </div>
 
@@ -87,32 +94,48 @@ export function renderUserInfo(app) {
     });
   });
 
-  // 年龄输入 - 实时显示分组
-  const ageInput = document.getElementById('input-age');
+  // 出生日期输入 - 自动计算年龄和分组
+  const birthInput = document.getElementById('input-birthdate');
+  const ageDisplay = document.getElementById('age-display');
   const ageGroupDisplay = document.getElementById('age-group-display');
   const ageError = document.getElementById('age-error');
 
-  ageInput.addEventListener('input', () => {
-    const age = parseInt(ageInput.value);
-    if (age >= 5 && age <= 17) {
+  function updateAgeFromBirth() {
+    const birthDate = birthInput.value;
+    if (!birthDate) {
+      ageDisplay.style.display = 'none';
+      ageGroupDisplay.style.display = 'none';
+      ageError.style.display = 'none';
+      return;
+    }
+
+    const age = store.calculateAge(birthDate);
+    if (age >= 5 && age <= 18) {
       const group = store.getAgeGroup(age);
+      ageDisplay.textContent = '🎈 年龄：' + age + '岁';
+      ageDisplay.style.display = 'block';
       ageGroupDisplay.textContent = '📌 你属于：' + group;
       ageGroupDisplay.style.display = 'block';
       ageError.style.display = 'none';
-    } else if (ageInput.value) {
+    } else if (age !== null) {
+      ageDisplay.textContent = '🎈 年龄：' + age + '岁';
+      ageDisplay.style.display = 'block';
       ageGroupDisplay.style.display = 'none';
-      ageError.textContent = '⚠️ 本测评适用于5-17岁的小朋友';
+      ageError.textContent = '⚠️ 本测评适用于5-18岁';
       ageError.style.display = 'block';
-    } else {
-      ageGroupDisplay.style.display = 'none';
-      ageError.style.display = 'none';
     }
-  });
+  }
+
+  birthInput.addEventListener('input', updateAgeFromBirth);
+  // 初始化显示
+  if (user.birthDate) {
+    updateAgeFromBirth();
+  }
 
   // 提交表单
   document.getElementById('btn-submit').addEventListener('click', () => {
     const name = document.getElementById('input-name').value.trim();
-    const age = parseInt(ageInput.value);
+    const birthDate = birthInput.value;
     const formError = document.getElementById('form-error');
 
     if (!name) {
@@ -120,8 +143,15 @@ export function renderUserInfo(app) {
       formError.style.display = 'block';
       return;
     }
-    if (!age || age < 5 || age > 17) {
-      formError.textContent = '⚠️ 请输入正确的年龄（5-17岁）';
+    if (!birthDate) {
+      formError.textContent = '⚠️ 请选择出生年月日';
+      formError.style.display = 'block';
+      return;
+    }
+
+    const age = store.calculateAge(birthDate);
+    if (!age || age < 5 || age > 18) {
+      formError.textContent = '⚠️ 本测评适用于5-18岁';
       formError.style.display = 'block';
       return;
     }
@@ -133,9 +163,9 @@ export function renderUserInfo(app) {
 
     const ageGroup = store.getAgeGroup(age);
     // 通过 userManager 创建新用户并登录
-    userManager.createUser({ name, age, gender: selectedGender, ageGroup });
+    userManager.createUser({ name, age, gender: selectedGender, birthDate, ageGroup });
     // 将 store 关联到新用户
-    store.setUser({ name, age, gender: selectedGender });
+    store.setUser({ name, age, gender: selectedGender, birthDate });
     store.set('startTime', Date.now());
     router.navigate('/test-select');
   });

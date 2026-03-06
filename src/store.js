@@ -1,35 +1,90 @@
 /**
- * 全局状态管理（多用户版，含 LocalStorage 持久化）
+ * 全局状态管理（多用户版，含 IndexedDB/LocalStorage 持久化）
  */
 import { userManager } from './userManager.js';
 import { saveTestHistory } from './utils/dataHistory.js';
+import { storage } from './utils/storageAdapter.js';
+import { DIMENSIONS } from './domain/dimensions.ts';
+
+function createDefaultProgressState() {
+    return Object.fromEntries(
+        DIMENSIONS.map(dimension => [
+            dimension.key,
+            {
+                completed: false,
+                subTests: new Array(dimension.subTests.length).fill(false)
+            }
+        ])
+    );
+}
+
+function createDefaultResultsState() {
+    return Object.fromEntries(
+        DIMENSIONS.map(dimension => [
+            dimension.key,
+            {
+                scores: new Array(dimension.subTests.length).fill(0),
+                totalScore: 0,
+                details: new Array(dimension.subTests.length).fill(null)
+            }
+        ])
+    );
+}
 
 const defaultState = {
     user: {
         name: '',
         age: null,
         gender: '',
+        birthDate: '',
         ageGroup: ''
     },
-    testProgress: {
-        planning: { completed: false, subTests: [false, false, false] },
-        attention: { completed: false, subTests: [false, false, false] },
-        simultaneous: { completed: false, subTests: [false, false, false] },
-        successive: { completed: false, subTests: [false, false, false] }
-    },
-    testResults: {
-        planning: { scores: [], totalScore: 0, details: [] },
-        attention: { scores: [], totalScore: 0, details: [] },
-        simultaneous: { scores: [], totalScore: 0, details: [] },
-        successive: { scores: [], totalScore: 0, details: [] }
-    },
+    testProgress: createDefaultProgressState(),
+    testResults: createDefaultResultsState(),
     startTime: null
 };
 
 class Store {
     constructor() {
-        this.state = this.load() || JSON.parse(JSON.stringify(defaultState));
+        const loaded = this.load();
+        this.state = this.normalizeState(loaded || JSON.parse(JSON.stringify(defaultState)));
         this.listeners = [];
+    }
+
+    normalizeState(state) {
+        const base = JSON.parse(JSON.stringify(defaultState));
+        const merged = {
+            ...base,
+            ...state,
+            user: { ...base.user, ...(state?.user || {}) },
+            testProgress: { ...base.testProgress, ...(state?.testProgress || {}) },
+            testResults: { ...base.testResults, ...(state?.testResults || {}) },
+        };
+
+        DIMENSIONS.forEach(dimension => {
+            const key = dimension.key;
+            const expectedLen = dimension.subTests.length;
+
+            const progress = merged.testProgress[key] || { completed: false, subTests: [] };
+            const progressSubs = Array.from({ length: expectedLen }, (_, i) => Boolean(progress.subTests?.[i]));
+            merged.testProgress[key] = {
+                ...progress,
+                subTests: progressSubs,
+                completed: progressSubs.every(Boolean),
+            };
+
+            const result = merged.testResults[key] || { scores: [], totalScore: 0, details: [] };
+            const scores = Array.from({ length: expectedLen }, (_, i) => Number(result.scores?.[i] || 0));
+            const details = Array.from({ length: expectedLen }, (_, i) => result.details?.[i] || null);
+            merged.testResults[key] = {
+                ...result,
+                scores,
+                details,
+                totalScore: scores.reduce((sum, item) => sum + (item || 0), 0),
+            };
+        });
+
+        return merged;
     }
 
     /**
@@ -42,8 +97,13 @@ class Store {
 
     load() {
         try {
-            const data = localStorage.getItem(this.getStorageKey());
-            return data ? JSON.parse(data) : null;
+            const data = storage.getItem(this.getStorageKey());
+            if (data) {
+                return typeof data === 'string' ? JSON.parse(data) : data;
+            }
+            // 降级：尝试从 localStorage 直接读取（首次启动时缓存可能未就绪）
+            const lsData = localStorage.getItem(this.getStorageKey());
+            return lsData ? JSON.parse(lsData) : null;
         } catch (e) {
             return null;
         }
@@ -51,9 +111,10 @@ class Store {
 
     save() {
         try {
-            localStorage.setItem(this.getStorageKey(), JSON.stringify(this.state));
+            const data = JSON.stringify(this.state);
+            storage.setItem(this.getStorageKey(), data);
         } catch (e) {
-            console.warn('无法保存数据到 LocalStorage');
+            console.warn('无法保存数据:', e.message);
         }
     }
 
@@ -80,21 +141,36 @@ class Store {
     }
 
     getAgeGroup(age) {
-        if (age >= 5 && age <= 6) return '幼儿组';
-        if (age >= 7 && age <= 9) return '小学低年级组';
-        if (age >= 10 && age <= 12) return '小学高年级组';
-        if (age >= 13 && age <= 15) return '初中组';
-        if (age >= 16 && age <= 17) return '高中组';
+        if (age >= 5 && age <= 7) return '5-7岁组';
+        if (age >= 8 && age <= 14) return '8-14岁组';
+        if (age >= 15 && age <= 18) return '15-18岁组';
         return '未知';
+    }
+
+    /**
+     * 根据出生日期计算年龄
+     */
+    calculateAge(birthDate) {
+        if (!birthDate) return null;
+        const birth = new Date(birthDate);
+        const today = new Date();
+        let age = today.getFullYear() - birth.getFullYear();
+        const monthDiff = today.getMonth() - birth.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+            age--;
+        }
+        return age;
     }
 
     setTestResult(dimension, subTestIndex, score, detail) {
         const results = this.state.testResults[dimension];
+        if (!results) return;
         results.scores[subTestIndex] = score;
         results.details[subTestIndex] = detail;
         results.totalScore = results.scores.reduce((a, b) => a + (b || 0), 0);
 
         const progress = this.state.testProgress[dimension];
+        if (!progress) return;
         progress.subTests[subTestIndex] = true;
         progress.completed = progress.subTests.every(Boolean);
 
@@ -106,14 +182,26 @@ class Store {
         return Object.values(this.state.testProgress).filter(p => p.completed).length;
     }
 
+    getCompletedSubTestCount() {
+        let count = 0;
+        Object.values(this.state.testProgress).forEach(p => {
+            count += p.subTests.filter(Boolean).length;
+        });
+        return count;
+    }
+
+    getTotalSubTestCount() {
+        return DIMENSIONS.reduce((sum, item) => sum + item.subTests.length, 0);
+    }
+
     isAllCompleted() {
         return Object.values(this.state.testProgress).every(p => p.completed);
     }
 
     getOverallScores() {
-        const dims = ['planning', 'attention', 'simultaneous', 'successive'];
         const maxPerDim = 100;
-        return dims.map(d => {
+        return DIMENSIONS.map(({ key }) => {
+            const d = key;
             const total = this.state.testResults[d].totalScore;
             return Math.min(Math.round(total), maxPerDim);
         });
@@ -155,8 +243,13 @@ class Store {
      */
     loadForUser(userId) {
         try {
-            const data = localStorage.getItem(userManager.getStorageKey(userId));
-            return data ? JSON.parse(data) : JSON.parse(JSON.stringify(defaultState));
+            const key = userManager.getStorageKey(userId);
+            const data = storage.getItem(key);
+            if (data) {
+                return typeof data === 'string' ? JSON.parse(data) : data;
+            }
+            const lsData = localStorage.getItem(key);
+            return lsData ? JSON.parse(lsData) : JSON.parse(JSON.stringify(defaultState));
         } catch (e) {
             return JSON.parse(JSON.stringify(defaultState));
         }

@@ -8,8 +8,10 @@ import { router } from '../../router.js';
 import { store } from '../../store.js';
 import { Timer, ReactionTimer } from '../../utils/timer.js';
 import { calculateScore } from '../../utils/scoring.js';
+import { TestSession, showPauseOverlay } from '../../utils/testSession.js';
 
 let currentTimer = null;
+let currentSession = null;
 
 export function renderSimultaneous(app) {
     const user = store.get('user');
@@ -113,6 +115,15 @@ function renderMatrixReasoning(app) {
                 () => finishSubTest(0, '图形矩阵推理', correct, currentQ || 1, reactionTimer, 1)
             );
             currentTimer.start();
+
+            currentSession = new TestSession('simultaneous', 0, { total: questions.length });
+            currentSession.startAutoSave();
+            document.getElementById('btn-pause')?.addEventListener('click', () => {
+                currentTimer.stop();
+                currentSession.pause();
+                showPauseOverlay(currentSession, () => currentTimer.start());
+            });
+
             showQuestion();
         },
         () => {
@@ -184,6 +195,15 @@ function renderSpatialRelation(app) {
                 () => finishSubTest(1, '空间关系', correct, currentQ || 1, reactionTimer, 2)
             );
             currentTimer.start();
+
+            currentSession = new TestSession('simultaneous', 1, { total: questions.length });
+            currentSession.startAutoSave();
+            document.getElementById('btn-pause')?.addEventListener('click', () => {
+                currentTimer.stop();
+                currentSession.pause();
+                showPauseOverlay(currentSession, () => currentTimer.start());
+            });
+
             showQuestion();
         },
         () => {
@@ -256,6 +276,15 @@ function renderWordRelation(app) {
                 () => finishSubTest(2, '词语关系', correct, currentQ || 1, reactionTimer, -1)
             );
             currentTimer.start();
+
+            currentSession = new TestSession('simultaneous', 2, { total: questions.length });
+            currentSession.startAutoSave();
+            document.getElementById('btn-pause')?.addEventListener('click', () => {
+                currentTimer.stop();
+                currentSession.pause();
+                showPauseOverlay(currentSession, () => currentTimer.start());
+            });
+
             showQuestion();
         },
         () => {
@@ -288,6 +317,7 @@ function renderTestShell(app, dimension, subName, icon, subtitle, bgGrad, timeLi
         </div>
         <div class="test-content" id="test-inner-content"></div>
         <div class="test-footer">
+          <button class="btn btn-secondary" id="btn-pause" style="margin-right:8px;">⏸️ 暂停</button>
           <button class="btn btn-secondary" id="btn-skip">跳过此项 →</button>
         </div>
       </div>

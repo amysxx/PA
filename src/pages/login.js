@@ -6,15 +6,15 @@ import { store } from '../store.js';
 import { userManager } from '../userManager.js';
 
 export function renderLogin(app) {
-    const users = userManager.getUsers();
+  const users = userManager.getUsers();
 
-    const avatarEmojis = ['🦊', '🐱', '🐶', '🐼', '🐨', '🦁', '🐸', '🐵', '🐰', '🐻', '🦄', '🐯', '🐷', '🐮', '🐲'];
+  const avatarEmojis = ['🦊', '🐱', '🐶', '🐼', '🐨', '🦁', '🐸', '🐵', '🐰', '🐻', '🦄', '🐯', '🐷', '🐮', '🐲'];
 
-    function getAvatar(index) {
-        return avatarEmojis[index % avatarEmojis.length];
-    }
+  function getAvatar(index) {
+    return avatarEmojis[index % avatarEmojis.length];
+  }
 
-    app.innerHTML = `
+  app.innerHTML = `
     <div class="bg-decoration">
       <div class="bg-blob bg-blob-1"></div>
       <div class="bg-blob bg-blob-2"></div>
@@ -101,55 +101,56 @@ export function renderLogin(app) {
     </div>
   `;
 
-    // 用户卡片点击 → 登录
-    document.querySelectorAll('.user-avatar-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const userId = card.dataset.userId;
-            store.switchUser(userId);
-            router.navigate('/test-select');
-        });
+  // 用户卡片点击 → 登录
+  document.querySelectorAll('.user-avatar-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const userId = card.dataset.userId;
+      store.switchUser(userId);
+      router.navigate('/test-select');
     });
+  });
 
-    // 创建新用户
-    document.getElementById('btn-create').addEventListener('click', () => {
-        router.navigate('/user-info');
-    });
+  // 创建新用户
+  document.getElementById('btn-create').addEventListener('click', () => {
+    router.navigate('/user-info');
+  });
 
-    // 管理员入口
-    const adminModal = document.getElementById('admin-modal');
-    document.getElementById('btn-admin').addEventListener('click', () => {
-        adminModal.style.display = 'flex';
-        document.getElementById('admin-password').focus();
-    });
+  // 管理员入口
+  const adminModal = document.getElementById('admin-modal');
+  document.getElementById('btn-admin').addEventListener('click', () => {
+    adminModal.style.display = 'flex';
+    document.getElementById('admin-password').focus();
+  });
 
-    document.getElementById('btn-admin-cancel').addEventListener('click', () => {
-        adminModal.style.display = 'none';
-        document.getElementById('admin-password').value = '';
-        document.getElementById('admin-error').style.display = 'none';
-    });
+  document.getElementById('btn-admin-cancel').addEventListener('click', () => {
+    adminModal.style.display = 'none';
+    document.getElementById('admin-password').value = '';
+    document.getElementById('admin-error').style.display = 'none';
+  });
 
-    document.getElementById('btn-admin-confirm').addEventListener('click', () => {
-        const pwd = document.getElementById('admin-password').value;
-        if (userManager.verifyAdmin(pwd)) {
-            router.navigate('/admin');
-        } else {
-            const errEl = document.getElementById('admin-error');
-            errEl.textContent = '❌ 密码错误，请重试';
-            errEl.style.display = 'block';
-        }
-    });
+  document.getElementById('btn-admin-confirm').addEventListener('click', () => {
+    const pwd = document.getElementById('admin-password').value;
+    if (userManager.verifyAdmin(pwd)) {
+      userManager.setAdmin(true);
+      router.navigate('/admin');
+    } else {
+      const errEl = document.getElementById('admin-error');
+      errEl.textContent = '❌ 密码错误，请重试';
+      errEl.style.display = 'block';
+    }
+  });
 
-    // 回车提交密码
-    document.getElementById('admin-password').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            document.getElementById('btn-admin-confirm').click();
-        }
-    });
+  // 回车提交密码
+  document.getElementById('admin-password').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      document.getElementById('btn-admin-confirm').click();
+    }
+  });
 
-    // 点击遮罩关闭弹窗
-    adminModal.addEventListener('click', (e) => {
-        if (e.target === adminModal) {
-            document.getElementById('btn-admin-cancel').click();
-        }
-    });
+  // 点击遮罩关闭弹窗
+  adminModal.addEventListener('click', (e) => {
+    if (e.target === adminModal) {
+      document.getElementById('btn-admin-cancel').click();
+    }
+  });
 }

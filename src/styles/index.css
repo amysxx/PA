@@ -464,20 +464,28 @@ body {
   z-index: 0;
 }
 
-.card-planning {
+.card-attention {
   background: linear-gradient(135deg, #6C5CE7, #A29BFE);
 }
 
-.card-attention {
-  background: linear-gradient(135deg, #E17055, #FDCB6E);
-}
-
-.card-simultaneous {
+.card-memory {
   background: linear-gradient(135deg, #00CEC9, #55EFC4);
 }
 
-.card-successive {
+.card-comprehension {
+  background: linear-gradient(135deg, #E17055, #FDCB6E);
+}
+
+.card-execution {
   background: linear-gradient(135deg, #FD79A8, #E84393);
+}
+
+.card-spatial {
+  background: linear-gradient(135deg, #0984E3, #74B9FF);
+}
+
+.card-processing {
+  background: linear-gradient(135deg, #F39C12, #FDCB6E);
 }
 
 .card-icon {
@@ -1551,5 +1559,54 @@ body {
 
   body {
     background: white;
+  }
+}
+
+/* ===== 题目管理组件样式 ===== */
+.btn-mini {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.btn-mini:hover {
+  background: rgba(108, 92, 231, 0.1);
+}
+
+.btn-mini-delete:hover {
+  background: rgba(225, 112, 85, 0.15);
+}
+
+.form-error {
+  color: #E17055;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(225, 112, 85, 0.08);
+}
+
+.admin-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: rgba(108, 92, 231, 0.12);
+  color: var(--primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

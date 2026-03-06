@@ -8,8 +8,10 @@ import { router } from '../../router.js';
 import { store } from '../../store.js';
 import { Timer, ReactionTimer } from '../../utils/timer.js';
 import { calculateScore } from '../../utils/scoring.js';
+import { TestSession, showPauseOverlay } from '../../utils/testSession.js';
 
 let currentTimer = null;
+let currentSession = null;
 
 export function renderSuccessive(app) {
   const user = store.get('user');
@@ -205,11 +207,19 @@ function renderDigitSpan(app) {
         </div>
         <div class="test-content" id="test-inner-content"></div>
         <div class="test-footer">
+          <button class="btn btn-secondary" id="btn-pause" style="margin-right:8px;">⏸️ 暂停</button>
           <button class="btn btn-secondary" id="btn-skip">跳过此项 →</button>
         </div>
       </div>
     </div>
   `;
+
+  currentSession = new TestSession('successive', 0, { total: rounds });
+  currentSession.startAutoSave();
+  document.getElementById('btn-pause')?.addEventListener('click', () => {
+    currentSession.pause();
+    showPauseOverlay(currentSession, () => { });
+  });
 
   nextRound();
 
@@ -383,11 +393,19 @@ function renderWordOrder(app) {
         </div>
         <div class="test-content" id="test-inner-content"></div>
         <div class="test-footer">
+          <button class="btn btn-secondary" id="btn-pause" style="margin-right:8px;">⏸️ 暂停</button>
           <button class="btn btn-secondary" id="btn-skip">跳过此项 →</button>
         </div>
       </div>
     </div>
   `;
+
+  currentSession = new TestSession('successive', 1, { total: rounds });
+  currentSession.startAutoSave();
+  document.getElementById('btn-pause')?.addEventListener('click', () => {
+    currentSession.pause();
+    showPauseOverlay(currentSession, () => { });
+  });
 
   nextRound();
 
@@ -475,11 +493,19 @@ function renderSentenceOrder(app) {
         </div>
         <div class="test-content" id="test-inner-content"></div>
         <div class="test-footer">
+          <button class="btn btn-secondary" id="btn-pause" style="margin-right:8px;">⏸️ 暂停</button>
           <button class="btn btn-secondary" id="btn-skip">跳过此项 →</button>
         </div>
       </div>
     </div>
   `;
+
+  currentSession = new TestSession('successive', 2, { total: questions.length });
+  currentSession.startAutoSave();
+  document.getElementById('btn-pause')?.addEventListener('click', () => {
+    currentSession.pause();
+    showPauseOverlay(currentSession, () => { });
+  });
 
   showQuestion();
 

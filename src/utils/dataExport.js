@@ -2,15 +2,15 @@
  * 数据导出工具
  * 支持 CSV、Excel、JSON 格式导出
  */
-import * as XLSX from 'xlsx';
-import { DIMENSION_NAMES } from './normativeData.js';
+import ExcelJS from 'exceljs';
+import { DIMENSION_NAMES } from '../domain/dimensions.ts';
 import { getTestHistory } from './dataHistory.js';
 
 /**
  * 导出单个用户数据为 CSV
  */
 export function exportUserToCSV(userData, testResults) {
-    const dims = ['planning', 'attention', 'simultaneous', 'successive'];
+    const dims = ['attention', 'memory', 'comprehension', 'execution'];
     const rows = [
         ['姓名', '年龄', '性别', '年龄组', '测评日期'],
         [userData.name, userData.age, userData.gender, userData.ageGroup, new Date().toLocaleDateString('zh-CN')],
@@ -42,7 +42,7 @@ export function exportUserToCSV(userData, testResults) {
  * 导出多用户数据为 Excel（管理员用）
  */
 export function exportUsersToExcel(usersData) {
-    const dims = ['planning', 'attention', 'simultaneous', 'successive'];
+    const dims = ['attention', 'memory', 'comprehension', 'execution'];
 
     // 汇总 sheet
     const summaryData = [
@@ -66,17 +66,16 @@ export function exportUsersToExcel(usersData) {
         ]);
     });
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(summaryData);
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('汇总');
+    ws.addRows(summaryData);
 
-    // 设置列宽
-    ws['!cols'] = [
-        { wch: 12 }, { wch: 6 }, { wch: 6 }, { wch: 14 },
-        { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
-        { wch: 8 }, { wch: 10 }
+    // 列宽（ExcelJS 使用字符宽度近似）
+    ws.columns = [
+        { width: 12 }, { width: 6 }, { width: 6 }, { width: 14 },
+        { width: 10 }, { width: 10 }, { width: 10 }, { width: 10 },
+        { width: 8 }, { width: 10 }
     ];
-
-    XLSX.utils.book_append_sheet(wb, ws, '汇总');
 
     // 每个用户详细数据 sheet
     usersData.forEach(u => {
@@ -98,13 +97,19 @@ export function exportUsersToExcel(usersData) {
             ]);
         });
 
-        const wsd = XLSX.utils.aoa_to_sheet(detailData);
         // 截断名字避免 Sheet 名太长
         const sheetName = (u.user.name || '未知').substring(0, 20);
-        XLSX.utils.book_append_sheet(wb, wsd, sheetName);
+        const wsd = wb.addWorksheet(sheetName);
+        wsd.addRows(detailData);
     });
 
-    XLSX.writeFile(wb, `测评数据汇总_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.xlsx`);
+    wb.xlsx.writeBuffer().then((buffer) => {
+        const date = new Date().toLocaleDateString('zh-CN').replace(/\//g, '-');
+        downloadBlob(
+            new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+            `测评数据汇总_${date}.xlsx`
+        );
+    });
 }
 
 /**
@@ -114,7 +119,7 @@ export function exportHistoryToExcel(userId, userName) {
     const history = getTestHistory(userId);
     if (history.length === 0) return;
 
-    const dims = ['planning', 'attention', 'simultaneous', 'successive'];
+    const dims = ['attention', 'memory', 'comprehension', 'execution'];
     const headerRow = ['序号', '日期', '计划能力', '注意过程', '同时性加工', '继时性加工', '总分', '综合百分位'];
     const data = [headerRow];
 
@@ -133,14 +138,20 @@ export function exportHistoryToExcel(userId, userName) {
         ]);
     });
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    ws['!cols'] = [
-        { wch: 6 }, { wch: 12 }, { wch: 10 }, { wch: 10 },
-        { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 12 }
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('历史记录');
+    ws.addRows(data);
+    ws.columns = [
+        { width: 6 }, { width: 12 }, { width: 10 }, { width: 10 },
+        { width: 10 }, { width: 10 }, { width: 8 }, { width: 12 }
     ];
-    XLSX.utils.book_append_sheet(wb, ws, '历史记录');
-    XLSX.writeFile(wb, `测评历史_${userName || '用户'}.xlsx`);
+
+    wb.xlsx.writeBuffer().then((buffer) => {
+        downloadBlob(
+            new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+            `测评历史_${userName || '用户'}.xlsx`
+        );
+    });
 }
 
 /**
@@ -156,6 +167,10 @@ export function exportToJSON(data, fileName) {
 function downloadFile(content, fileName, mimeType) {
     const BOM = '\uFEFF';
     const blob = new Blob([BOM + content], { type: `${mimeType}` });
+    downloadBlob(blob, fileName);
+}
+
+function downloadBlob(blob, fileName) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

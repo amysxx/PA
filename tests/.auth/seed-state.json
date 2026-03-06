@@ -1,0 +1,22 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:3000",
+      "localStorage": [
+        {
+          "name": "pass_user_u_seed_001",
+          "value": "{\"user\":{\"name\":\"初始化用户\",\"age\":10,\"gender\":\"男\",\"birthDate\":\"2016-01-01\",\"ageGroup\":\"8-14岁组\"},\"testProgress\":{\"attention\":{\"completed\":false,\"subTests\":[false,false,false]},\"memory\":{\"completed\":false,\"subTests\":[false,false,false]},\"comprehension\":{\"completed\":false,\"subTests\":[false,false,false]},\"execution\":{\"completed\":false,\"subTests\":[false,false,false]},\"spatial\":{\"completed\":false,\"subTests\":[false,false,false]},\"processing\":{\"completed\":false,\"subTests\":[false,false]}},\"testResults\":{\"attention\":{\"scores\":[0,0,0],\"totalScore\":0,\"details\":[null,null,null]},\"memory\":{\"scores\":[0,0,0],\"totalScore\":0,\"details\":[null,null,null]},\"comprehension\":{\"scores\":[0,0,0],\"totalScore\":0,\"details\":[null,null,null]},\"execution\":{\"scores\":[0,0,0],\"totalScore\":0,\"details\":[null,null,null]},\"spatial\":{\"scores\":[0,0,0],\"totalScore\":0,\"details\":[null,null,null]},\"processing\":{\"scores\":[0,0],\"totalScore\":0,\"details\":[null,null]}},\"startTime\":null}"
+        },
+        {
+          "name": "pass_current_user",
+          "value": "u_seed_001"
+        },
+        {
+          "name": "pass_users",
+          "value": "[{\"id\":\"u_seed_001\",\"name\":\"初始化用户\",\"age\":10,\"gender\":\"男\",\"birthDate\":\"2016-01-01\",\"ageGroup\":\"8-14岁组\",\"createdAt\":1772768233391}]"
+        }
+      ]
+    }
+  ]
+}

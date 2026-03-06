@@ -1,212 +1,227 @@
 /**
  * PDF 报告生成器
- * 使用 jsPDF 生成专业的测评报告 PDF
+ * 使用 html2canvas + jsPDF 生成所见即所得的报告
  */
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-import { DIMENSION_NAMES } from './normativeData.js';
-import { getScoreLevel, getDimensionLevel, getSuggestions } from './scoring.js';
+import html2canvas from 'html2canvas';
 
 /**
  * 生成单个用户的测评报告 PDF
+ * @param {HTMLElement} elementToPrint - 需要导出的 DOM 元素
+ * @param {string} userName - 用户名
  */
-export function generateUserReportPDF(userData, testResults, standardizedScores) {
-    const doc = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = doc.internal.pageSize.getWidth();
-    let y = 20;
-
-    // 注册中文字体支持（使用内置字体）
-    doc.setFont('helvetica');
-
-    // ===== 标题 =====
-    doc.setFontSize(22);
-    doc.setFont('helvetica', 'bold');
-    doc.text('认知力测评报告', pageWidth / 2, y, { align: 'center' });
-    y += 10;
-
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text('智趣认知乐园 - 基于 PASS 理论', pageWidth / 2, y, { align: 'center' });
-    y += 15;
-
-    // ===== 基本信息 =====
-    doc.setFontSize(10);
-    const userInfo = [
-        `姓名：${userData.name}`,
-        `年龄：${userData.age}岁`,
-        `性别：${userData.gender}`,
-        `年龄组：${userData.ageGroup}`,
-        `测评日期：${new Date().toLocaleDateString('zh-CN')}`
-    ];
-    userInfo.forEach(info => {
-        doc.text(info, 20, y);
-        y += 6;
-    });
-    y += 5;
-
-    // ===== 分割线 =====
-    doc.setLineWidth(0.5);
-    doc.setDrawColor(108, 92, 231);
-    doc.line(20, y, pageWidth - 20, y);
-    y += 10;
-
-    // ===== 各维度得分表格 =====
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('四维度认知评估', 20, y);
-    y += 8;
-
-    const dims = ['planning', 'attention', 'simultaneous', 'successive'];
-    const scores = dims.map(d => testResults[d]?.totalScore || 0);
-    const totalScore = scores.reduce((a, b) => a + b, 0);
-    const avgScore = Math.round(totalScore / 4);
-
-    const tableData = dims.map((dim, i) => {
-        const s = standardizedScores?.[dim];
-        return [
-            DIMENSION_NAMES[dim],
-            scores[i].toString(),
-            s ? `${Math.round(s.percentile)}%` : '-',
-            s ? s.t.toString() : '-',
-            s ? `${s.rating.label}` : '-'
-        ];
-    });
-
-    doc.autoTable({
-        startY: y,
-        head: [['维度', '原始分', '百分位', 'T分数', '评级']],
-        body: tableData,
-        theme: 'grid',
-        styles: { fontSize: 10, cellPadding: 4 },
-        headStyles: { fillColor: [108, 92, 231], textColor: 255, fontStyle: 'bold' },
-        columnStyles: {
-            0: { fontStyle: 'bold' },
-            1: { halign: 'center' },
-            2: { halign: 'center' },
-            3: { halign: 'center' },
-            4: { halign: 'center' }
-        }
-    });
-
-    y = doc.lastAutoTable.finalY + 10;
-
-    // ===== 综合评分 =====
-    const overallLevel = getScoreLevel(avgScore);
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`综合评分：${avgScore}分 （${overallLevel.level}）`, 20, y);
-    y += 8;
-
-    if (standardizedScores?.overall) {
-        doc.setFont('helvetica', 'normal');
-        doc.text(`综合百分位：${Math.round(standardizedScores.overall.avgPercentile)}% （${standardizedScores.overall.rating.label}）`, 20, y);
-        y += 10;
+export async function generateUserReportPDF(elementToPrint, userName) {
+    if (!elementToPrint) {
+        console.error('未找到报告元素');
+        return;
     }
 
-    // ===== 建议 =====
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('个性化指导建议', 20, y);
-    y += 8;
+    try {
+        // 显示加载提示
+        document.body.style.cursor = 'wait';
 
-    dims.forEach((dim, i) => {
-        const suggestions = getSuggestions(dim, scores[i]);
-        if (suggestions.length > 0) {
-            if (y > 260) {
-                doc.addPage();
-                y = 20;
+        // 1. 智能分页处理
+        // A4 纸比例，假设宽度为 1, 高度约为 1.414
+        // 在 html2canvas 中，我们需要模拟 A4 纸的高度
+        // 这里的 strategy 不是预先计算 pixel，而是根据当前宽度的比例计算
+
+        const originalWidth = elementToPrint.scrollWidth;
+        // jsPDF A4 width is 210mm. We use this to calculate the equivalent height in pixels
+        // based on the element's width.
+        const a4Ratio = 297 / 210;
+        const pageHeightInPixels = originalWidth * a4Ratio;
+
+        // 备份原始样式，以便恢复
+        const originalStyles = [];
+        const spacers = [];
+
+        // 遍历一级子元素，计算累积高度
+        const children = Array.from(elementToPrint.children);
+        let accumulatedHeight = 0;
+
+        // 顶部 padding 也要算入
+        const computedStyle = window.getComputedStyle(elementToPrint);
+        accumulatedHeight += parseFloat(computedStyle.paddingTop) || 0;
+
+        children.forEach(child => {
+            // 跳过忽略的元素 (如 navbar 等，如果有 data-html2canvas-ignore)
+            if (child.hasAttribute('data-html2canvas-ignore') || child.style.display === 'none') return;
+
+            const childHeight = child.offsetHeight;
+            const childStyle = window.getComputedStyle(child);
+            const marginTop = parseFloat(childStyle.marginTop) || 0;
+            const marginBottom = parseFloat(childStyle.marginBottom) || 0;
+            const totalChildHeight = childHeight + marginTop + marginBottom;
+
+            // 检查当前元素是否跨越分页线
+            // 当前元素的起始位置
+            const currentStart = accumulatedHeight;
+            // 当前元素的结束位置
+            const currentEnd = accumulatedHeight + totalChildHeight;
+
+            // 所在的页码 (0-indexed)
+            const startPage = Math.floor(currentStart / pageHeightInPixels);
+            const endPage = Math.floor(currentEnd / pageHeightInPixels);
+
+            // 如果跨页了，且元素本身高度小于一页（避免大元素无限循环），则强制推到下一页
+            if (startPage !== endPage && totalChildHeight < pageHeightInPixels) {
+                // 计算需要增加的 margin-top
+                // 目标位置是下一页的起始位置
+                const nextPageStart = (startPage + 1) * pageHeightInPixels;
+                const spacerHeight = nextPageStart - currentStart;
+
+                // 记录原始样式以便恢复
+                originalStyles.push({ element: child, originalMarginTop: child.style.marginTop });
+
+                // 设置新的 margin-top (叠加原有的)
+                child.style.marginTop = `${marginTop + spacerHeight}px`;
+
+                // 更新累积高度：加上 spacer 和 元素高度
+                accumulatedHeight += spacerHeight + totalChildHeight;
+            } else {
+                accumulatedHeight += totalChildHeight;
             }
-            doc.setFontSize(11);
-            doc.setFont('helvetica', 'bold');
-            doc.text(`${DIMENSION_NAMES[dim]}：`, 20, y);
-            y += 6;
+        });
 
-            doc.setFontSize(9);
-            doc.setFont('helvetica', 'normal');
-            suggestions.forEach(s => {
-                if (y > 270) {
-                    doc.addPage();
-                    y = 20;
-                }
-                const lines = doc.splitTextToSize(`• ${s}`, pageWidth - 50);
-                doc.text(lines, 25, y);
-                y += lines.length * 5;
-            });
-            y += 3;
+        // 2. 生成 Canvas
+        const canvas = await html2canvas(elementToPrint, {
+            scale: 2, // 提高清晰度
+            useCORS: true,
+            logging: false,
+            windowWidth: elementToPrint.scrollWidth,
+            windowHeight: elementToPrint.scrollHeight // 使用新的高度
+        });
+
+        // 3. 恢复样式
+        originalStyles.forEach(item => {
+            item.element.style.marginTop = item.originalMarginTop;
+        });
+
+        const contentWidth = canvas.width;
+        const contentHeight = canvas.height;
+
+        // A4 尺寸 (mm)
+        const pdfWidth = 210;
+        const pdfHeight = 297;
+
+        const margin = 10; // PDF 页边距
+        const imgWidth = pdfWidth - (margin * 2);
+        const imgHeight = (contentHeight * imgWidth) / contentWidth;
+
+        const doc = new jsPDF('p', 'mm', 'a4');
+
+        let heightLeft = imgHeight;
+        let position = 0;
+
+        const pageData = canvas.toDataURL('image/jpeg', 0.95);
+
+        // 第一页
+        doc.addImage(pageData, 'JPEG', margin, margin, imgWidth, imgHeight);
+        heightLeft -= (pdfHeight - margin * 2);
+
+        // 后续页
+        while (heightLeft > 0) {
+            position = heightLeft - imgHeight;
+            doc.addPage();
+            // 调整 position 以显示图片的下一部分
+            // 注意：addImage 的 y 参数如果是负数，相当于把图片向上移动，从而露出下面的部分
+            // 我们需要计算准确的偏移量。
+            // 每一页显示的图片高度由 PDF 页面高度决定 (减去 margin)
+            const pageContentHeight = pdfHeight - margin * 2;
+
+            // 当前页应该显示的图片区域的顶部在整个图片中的位置
+            // 第一页显示了 0 ~ pageContentHeight
+            // 第二页应该显示 pageContentHeight ~ 2 * pageContentHeight
+            // addImage 的 y 坐标应该是: margin - (当前页数 * pageContentHeight)
+
+            const currentPage = doc.internal.getNumberOfPages();
+            const yOffset = margin - ((currentPage - 1) * pageContentHeight);
+
+            doc.addImage(pageData, 'JPEG', margin, yOffset, imgWidth, imgHeight);
+            heightLeft -= pageContentHeight;
         }
-    });
 
-    // ===== 底部声明 =====
-    if (y > 260) {
-        doc.addPage();
-        y = 20;
+        const fileName = `认知测评报告_${userName}_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.pdf`;
+        doc.save(fileName);
+
+    } catch (error) {
+        console.error('PDF 生成失败:', error);
+        alert('PDF 生成失败，请重试');
+    } finally {
+        document.body.style.cursor = 'default';
+        // 再次确保恢复（防止出错中断导致样式未恢复）
+        // 实际应用中可能需要更健壮的恢复机制
     }
-    y += 10;
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'italic');
-    doc.setTextColor(150);
-    doc.text('本测评基于 PASS 认知理论，结果仅供参考。如有进一步需求，建议咨询专业心理咨询师。', pageWidth / 2, y, { align: 'center' });
-
-    // 保存
-    const fileName = `认知测评报告_${userData.name}_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.pdf`;
-    doc.save(fileName);
-    return fileName;
 }
 
 /**
  * 生成班级统计报告 PDF（管理员用）
+ * 动态创建表格 DOM，渲染后截图
  */
-export function generateClassReportPDF(usersData) {
-    const doc = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = doc.internal.pageSize.getWidth();
-    let y = 20;
+export async function generateClassReportPDF(usersData) {
+    // 1. 动态创建隐藏的容器和表格
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    container.style.top = '0';
+    container.style.width = '800px'; // A4 宽度适中
+    container.style.background = '#fff';
+    container.style.padding = '40px';
+    container.style.fontFamily = 'Helvetica, Arial, sans-serif'; // 使用通用字体，浏览器会渲染中文
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
-    doc.text('班级认知测评统计报告', pageWidth / 2, y, { align: 'center' });
-    y += 10;
+    const dateStr = new Date().toLocaleDateString('zh-CN');
 
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`生成日期：${new Date().toLocaleDateString('zh-CN')}`, pageWidth / 2, y, { align: 'center' });
-    doc.text(`参与人数：${usersData.length}`, pageWidth / 2, y + 6, { align: 'center' });
-    y += 20;
+    let tableHtml = `
+        <h1 style="text-align:center; margin-bottom:10px;">班级认知测评统计报告</h1>
+        <p style="text-align:center; color:#666; margin-bottom:30px;">生成日期：${dateStr} · 参与人数：${usersData.length}</p>
+        <table style="width:100%; border-collapse:collapse; font-size:12px;">
+            <thead>
+                <tr style="background:#6C5CE7; color:#fff;">
+                    <th style="padding:10px; border:1px solid #ccc;">姓名</th>
+                    <th style="padding:10px; border:1px solid #ccc;">年龄</th>
+                    <th style="padding:10px; border:1px solid #ccc;">性别</th>
+                    <th style="padding:10px; border:1px solid #ccc;">计划</th>
+                    <th style="padding:10px; border:1px solid #ccc;">注意</th>
+                    <th style="padding:10px; border:1px solid #ccc;">同时</th>
+                    <th style="padding:10px; border:1px solid #ccc;">继时</th>
+                    <th style="padding:10px; border:1px solid #ccc;">总分</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
 
-    // 汇总表格
-    const tableData = usersData.map(u => {
+    usersData.forEach((u, index) => {
         const results = u.testResults || {};
-        const dims = ['planning', 'attention', 'simultaneous', 'successive'];
+        const dims = ['attention', 'memory', 'comprehension', 'execution'];
         const scores = dims.map(d => results[d]?.totalScore || 0);
         const total = scores.reduce((a, b) => a + b, 0);
-        return [
-            u.user?.name || '未知',
-            u.user?.age?.toString() || '-',
-            u.user?.gender || '-',
-            scores[0].toString(),
-            scores[1].toString(),
-            scores[2].toString(),
-            scores[3].toString(),
-            total.toString()
-        ];
+
+        tableHtml += `
+            <tr style="background:${index % 2 === 0 ? '#fff' : '#f9f9f9'};">
+                <td style="padding:8px; border:1px solid #ccc; text-align:center;">${u.user?.name || '未知'}</td>
+                <td style="padding:8px; border:1px solid #ccc; text-align:center;">${u.user?.age || '-'}</td>
+                <td style="padding:8px; border:1px solid #ccc; text-align:center;">${u.user?.gender || '-'}</td>
+                <td style="padding:8px; border:1px solid #ccc; text-align:center;">${scores[0]}</td>
+                <td style="padding:8px; border:1px solid #ccc; text-align:center;">${scores[1]}</td>
+                <td style="padding:8px; border:1px solid #ccc; text-align:center;">${scores[2]}</td>
+                <td style="padding:8px; border:1px solid #ccc; text-align:center;">${scores[3]}</td>
+                <td style="padding:8px; border:1px solid #ccc; text-align:center; font-weight:bold;">${total}</td>
+            </tr>
+        `;
     });
 
-    doc.autoTable({
-        startY: y,
-        head: [['姓名', '年龄', '性别', '计划', '注意', '同时', '继时', '总分']],
-        body: tableData,
-        theme: 'grid',
-        styles: { fontSize: 9, cellPadding: 3 },
-        headStyles: { fillColor: [108, 92, 231], textColor: 255, fontStyle: 'bold' },
-        columnStyles: {
-            3: { halign: 'center' },
-            4: { halign: 'center' },
-            5: { halign: 'center' },
-            6: { halign: 'center' },
-            7: { halign: 'center', fontStyle: 'bold' }
-        }
-    });
+    tableHtml += `
+            </tbody>
+        </table>
+    `;
 
-    const fileName = `班级测评统计_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.pdf`;
-    doc.save(fileName);
-    return fileName;
+    container.innerHTML = tableHtml;
+    document.body.appendChild(container);
+
+    try {
+        await generateUserReportPDF(container, `班级统计_${dateStr.replace(/\//g, '-')}`);
+    } finally {
+        document.body.removeChild(container);
+    }
 }
+
