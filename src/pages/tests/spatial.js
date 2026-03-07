@@ -74,11 +74,10 @@ function showResult(score, testName, correct, total, nextSub) {
         <div style="font-family:var(--font-display); font-size:3rem; font-weight:900; color:#0984E3; margin:12px 0;">${Math.round(score)}分</div>
         <div class="modal-text">正确: ${correct}/${total}</div>
         <div class="modal-actions">
-          ${
-            nextSub >= 0
-              ? '<button class="btn btn-primary" id="btn-next">继续下一项 →</button>'
-              : '<button class="btn btn-primary" id="btn-back">返回选择</button>'
-          }
+          ${nextSub >= 0
+      ? '<button class="btn btn-primary" id="btn-next">继续下一项 →</button>'
+      : '<button class="btn btn-primary" id="btn-back">返回选择</button>'
+    }
         </div>
       </div>
     </div>
@@ -129,13 +128,12 @@ function renderSpatialPerception(app) {
       <div class="test-question">观察高亮方格，选择其坐标</div>
       <div style="display:grid; grid-template-columns:repeat(3, 64px); gap:8px; justify-content:center; margin:12px 0 20px;">
         ${'ABCDEFGHI'
-          .split('')
-          .map(
-            c => `<div style="height:64px; border-radius:8px; display:flex; align-items:center; justify-content:center; background:${
-              c === q.target ? '#74B9FF' : '#EEF6FF'
+        .split('')
+        .map(
+          c => `<div style="height:64px; border-radius:8px; display:flex; align-items:center; justify-content:center; background:${c === q.target ? '#74B9FF' : '#EEF6FF'
             }; border:2px solid ${c === q.target ? '#0984E3' : '#D8E9FF'}; font-weight:700;">${c}</div>`,
-          )
-          .join('')}
+        )
+        .join('')}
       </div>
       <div class="test-options">
         ${q.options.map((opt, i) => `<div class="test-option" data-idx="${i}">${opt}</div>`).join('')}
@@ -255,14 +253,80 @@ function renderMentalRotation(app) {
 }
 
 function renderSpatialVisualization(app) {
+  // 每道题带 SVG 辅助图
   const questions = [
-    { prompt: '展开图折成立方体后，A面相对的是？', options: ['B', 'C', 'D', 'E'], answer: 1 },
-    { prompt: '若正方体顶部是红色，底部一定是？', options: ['蓝色', '与顶面不同色', '黄色', '未知'], answer: 1 },
-    { prompt: '将图形顺时针旋转90°，朝向将变为？', options: ['上', '右', '下', '左'], answer: 1 },
-    { prompt: '折叠后相邻的两个面不可能是？', options: ['前和右', '上和下', '前和上', '左和后'], answer: 1 },
-    { prompt: '空间路径“前-右-前”，终点相对起点？', options: ['左前', '右前', '正前', '右后'], answer: 1 },
+    {
+      prompt: '下图展开后，哪个面和 A 面相对？',
+      svg: `<svg width="200" height="160" viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:12px auto;">
+        <rect x="60" y="10" width="50" height="50" fill="#a9cce3" stroke="#555" stroke-width="2"/>
+        <text x="85" y="42" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">A</text>
+        <rect x="10" y="60" width="50" height="50" fill="#f9e79f" stroke="#555" stroke-width="2"/>
+        <text x="35" y="92" text-anchor="middle" font-size="14" fill="#333">B</text>
+        <rect x="60" y="60" width="50" height="50" fill="#a9dfbf" stroke="#555" stroke-width="2"/>
+        <text x="85" y="92" text-anchor="middle" font-size="14" fill="#333">C</text>
+        <rect x="110" y="60" width="50" height="50" fill="#f0b27a" stroke="#555" stroke-width="2"/>
+        <text x="135" y="92" text-anchor="middle" font-size="14" fill="#333">D</text>
+        <rect x="60" y="110" width="50" height="50" fill="#d2b4de" stroke="#555" stroke-width="2"/>
+        <text x="85" y="142" text-anchor="middle" font-size="14" fill="#333">E</text>
+      </svg>`,
+      options: ['B', 'C', 'D', 'E'], answer: 1
+    },
+    {
+      prompt: '将图形顺时针旋转 90°，箭头将指向哪个方向？',
+      svg: `<svg width="160" height="120" viewBox="0 0 160 120" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:12px auto;">
+        <rect x="20" y="30" width="120" height="60" rx="10" fill="#d6eaf8" stroke="#5dade2" stroke-width="2"/>
+        <text x="80" y="55" text-anchor="middle" font-size="13" fill="#555">旋转前</text>
+        <polygon points="70,75 90,75 80,58" fill="#2e86c1"/>
+        <text x="80" y="100" text-anchor="middle" font-size="12" fill="#333">↑（朝上）</text>
+      </svg>`,
+      options: ['朝右', '朝下', '朝左', '朝上'], answer: 0
+    },
+    {
+      prompt: '如图，正方体顶部标星号(★)，面朝右侧的是哪面？',
+      svg: `<svg width="160" height="140" viewBox="0 0 160 140" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:12px auto;">
+        <polygon points="30,90 80,60 130,90 80,120" fill="#d5f5e3" stroke="#444" stroke-width="1.5"/>
+        <polygon points="30,90 80,60 80,20 30,50" fill="#aed6f1" stroke="#444" stroke-width="1.5"/>
+        <polygon points="130,90 80,60 80,20 130,50" fill="#fdebd0" stroke="#444" stroke-width="1.5"/>
+        <text x="80" y="42" text-anchor="middle" font-size="16">★</text>
+        <text x="50" y="80" text-anchor="middle" font-size="11" fill="#555">左</text>
+        <text x="110" y="80" text-anchor="middle" font-size="11" fill="#555">右</text>
+      </svg>`,
+      options: ['橙色面', '蓝色面', '绿色面', '无法判断'], answer: 0
+    },
+    {
+      prompt: '沿虚线折叠，哪两个面会相互重叠？',
+      svg: `<svg width="200" height="100" viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:12px auto;">
+        <rect x="10" y="20" width="50" height="60" fill="#f9e79f" stroke="#555" stroke-width="2"/>
+        <text x="35" y="57" text-anchor="middle" font-size="13" fill="#555">1</text>
+        <line x1="60" y1="20" x2="60" y2="80" stroke="#888" stroke-width="1.5" stroke-dasharray="6,3"/>
+        <rect x="60" y="20" width="60" height="60" fill="#a9dfbf" stroke="#555" stroke-width="2"/>
+        <text x="90" y="57" text-anchor="middle" font-size="13" fill="#555">2</text>
+        <line x1="120" y1="20" x2="120" y2="80" stroke="#888" stroke-width="1.5" stroke-dasharray="6,3"/>
+        <rect x="120" y="20" width="50" height="60" fill="#a9cce3" stroke="#555" stroke-width="2"/>
+        <text x="145" y="57" text-anchor="middle" font-size="13" fill="#555">3</text>
+      </svg>`,
+      options: ['1和3', '1和2', '2和3', '不会重叠'], answer: 0
+    },
+    {
+      prompt: '路径：出发→向右走2步→向上走2步→向左走2步，终点相对出发点在？',
+      svg: `<svg width="180" height="160" viewBox="0 0 180 160" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:12px auto;">
+        <defs><marker id="ar" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#e74c3c"/></marker></defs>
+        <circle cx="30" cy="130" r="8" fill="#2ecc71"/>
+        <text x="30" y="155" text-anchor="middle" font-size="11" fill="#2ecc71">出发</text>
+        <line x1="38" y1="130" x2="110" y2="130" stroke="#e74c3c" stroke-width="2" marker-end="url(#ar)"/>
+        <text x="74" y="122" text-anchor="middle" font-size="11" fill="#c0392b">→右2步</text>
+        <line x1="110" y1="122" x2="110" y2="60" stroke="#e74c3c" stroke-width="2" marker-end="url(#ar)"/>
+        <text x="127" y="95" text-anchor="middle" font-size="11" fill="#c0392b">↑上2步</text>
+        <line x1="102" y1="60" x2="38" y2="60" stroke="#e74c3c" stroke-width="2" marker-end="url(#ar)"/>
+        <text x="70" y="52" text-anchor="middle" font-size="11" fill="#c0392b">←左2步</text>
+        <circle cx="30" cy="60" r="8" fill="#e74c3c"/>
+        <text x="30" y="42" text-anchor="middle" font-size="11" fill="#e74c3c">终点</text>
+      </svg>`,
+      options: ['正上方', '左前方', '右上方', '正右方'], answer: 0
+    },
   ];
-  renderShell(app, '📦', '空间可视化', '根据空间规则做判断', TESTS[2].timeLimit);
+
+  renderShell(app, '📦', '空间可视化', '观察图形，作出空间判断', TESTS[2].timeLimit);
 
   const timerEl = document.getElementById('timer');
   let index = 0;
@@ -282,7 +346,8 @@ function renderSpatialVisualization(app) {
     content.innerHTML = `
       <div style="font-size:0.85rem; color:var(--text-light); margin-bottom:10px;">第 ${index + 1}/${questions.length} 题</div>
       <div class="test-question">${q.prompt}</div>
-      <div class="test-options">${q.options.map((opt, i) => `<div class="test-option" data-idx="${i}">${opt}</div>`).join('')}</div>
+      ${q.svg}
+      <div class="test-options">${q.options.map((opt, i) => `<div class="test-option" data-idx="${i}">${String.fromCharCode(65 + i)}. ${opt}</div>`).join('')}</div>
     `;
     rt.start();
     content.querySelectorAll('.test-option').forEach(el => {
@@ -290,22 +355,22 @@ function renderSpatialVisualization(app) {
         const answerIdx = Number(el.dataset.idx);
         const ok = answerIdx === q.answer;
         rt.record();
-        if (ok) {
-          correct++;
-          el.classList.add('correct');
-        } else {
-          wrong++;
-          el.classList.add('wrong');
+        if (ok) { correct++; el.classList.add('correct'); }
+        else {
+          wrong++; el.classList.add('wrong');
+          content.querySelectorAll('.test-option').forEach(o => {
+            if (Number(o.dataset.idx) === q.answer) o.classList.add('correct');
+          });
         }
         questionLogs.push({
           prompt: q.prompt,
-          shown: '-',
+          shown: 'SVG图形',
           userAnswer: q.options[answerIdx],
           correctAnswer: q.options[q.answer],
           isCorrect: ok,
         });
         index++;
-        setTimeout(showQ, 350);
+        setTimeout(showQ, 400);
       });
     });
   };
@@ -322,4 +387,5 @@ function renderSpatialVisualization(app) {
   document.getElementById('btn-skip').addEventListener('click', () => finishSubTest(2, correct, index || 1, wrong, rt, questionLogs));
   showQ();
 }
+
 

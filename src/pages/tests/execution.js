@@ -534,8 +534,10 @@ function showResult(score, testName, achieved, total, nextSubIndex) {
 
 function getDifficulty(ageGroup) {
   const configs = {
-    '5-7岁组': { rounds: 5, timeLimit: 60, goNoGoCount: 15, stimulusDuration: 1200, flexRounds: 10, ruleSwitchAfter: 3 },
-    '8-14岁组': { rounds: 8, timeLimit: 90, goNoGoCount: 30, stimulusDuration: 800, flexRounds: 20, ruleSwitchAfter: 4 }
+    '5-7岁组': { rounds: 4, timeLimit: 70, goNoGoCount: 12, stimulusDuration: 1500, flexRounds: 8, ruleSwitchAfter: 2 },  // 幼小: 慢速/少题
+    '8-11岁组': { rounds: 6, timeLimit: 80, goNoGoCount: 20, stimulusDuration: 1000, flexRounds: 14, ruleSwitchAfter: 3 },  // 小学: 适中
+    '12-14岁组': { rounds: 8, timeLimit: 90, goNoGoCount: 30, stimulusDuration: 800, flexRounds: 20, ruleSwitchAfter: 4 },  // 初中: 标准
+    '15-18岁组': { rounds: 10, timeLimit: 90, goNoGoCount: 40, stimulusDuration: 600, flexRounds: 26, ruleSwitchAfter: 5 },  // 高中: 高强度
   };
-  return configs[ageGroup] || configs['8-14岁组'];
+  return configs[ageGroup] || configs['8-11岁组'];
 }

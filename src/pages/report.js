@@ -26,7 +26,7 @@ function getDimensionLevel(score) {
   return { label: '需重点关注', color: '#D63031' };
 }
 
-function buildAdviceRows(scores, results) {
+function buildAdviceRows(scores, _results) {
   const sorted = [...scores].sort((a, b) => b.score - a.score);
   const strongest = sorted[0];
   const weakest = sorted[sorted.length - 1];
@@ -91,6 +91,77 @@ export function renderReport(app) {
     router.navigate('/login');
     return;
   }
+
+  // 守卫：尚未完成全部测评时，显示友好提示而非空报告
+  // 例外：管理员已通过密码验证的临时授权
+  const completedCount = store.getCompletedSubTestCount();
+  const totalCount = store.getTotalSubTestCount();
+  const allDone = store.isAllCompleted();
+  const adminUnlocked = sessionStorage.getItem('admin_report_unlock') === 'true';
+  if (adminUnlocked) {
+    // 清除一次性授权标记
+    sessionStorage.removeItem('admin_report_unlock');
+  }
+  if (!allDone && !adminUnlocked) {
+
+    const renderIncomplete = () => {
+      app.innerHTML = `
+        <div class="navbar">
+          <a class="navbar-brand" href="#/test-select"><span class="navbar-brand-icon">🧠</span><span>智趣认知乐园</span></a>
+        </div>
+        <div class="page has-navbar" style="display:flex;align-items:center;justify-content:center;">
+          <div class="container" style="max-width:520px;text-align:center;">
+            <div style="font-size:3.5rem;margin-bottom:12px;">⚠️</div>
+            <h2 style="font-family:var(--font-display);font-size:1.5rem;font-weight:900;color:var(--text-primary);margin-bottom:8px;">测评尚未完成</h2>
+            <p style="color:var(--text-secondary);margin-bottom:6px;">你已完成 <strong style="color:var(--primary);font-size:1.1rem;">${completedCount}</strong> / ${totalCount} 个子测评。</p>
+            <p style="color:var(--text-secondary);font-size:0.88rem;margin-bottom:24px;">请完成全部子测评后，再查看完整测评报告，以获得准确的认知画像和个性化建议。</p>
+            <button id="btn-back-to-select" class="btn btn-primary" style="width:200px;margin-bottom:20px;">继续完成测评</button>
+
+            <div style="margin-top:12px;padding:20px;border-radius:var(--radius-lg);background:var(--bg-card);border:1px solid var(--border);text-align:left;">
+              <div style="font-size:0.88rem;font-weight:700;color:var(--text-secondary);margin-bottom:12px;">🔑 管理员提前查看报告</div>
+              <div style="display:flex;gap:8px;">
+                <input id="admin-pwd-input" type="password" placeholder="输入管理员密码" autocomplete="off"
+                  style="flex:1;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-main);color:var(--text-primary);font-size:0.9rem;outline:none;">
+                <button id="admin-unlock-btn" class="btn btn-secondary" style="padding:10px 16px;font-size:0.85rem;white-space:nowrap;">解锁查看</button>
+              </div>
+              <div id="admin-pwd-error" style="color:#ef4444;font-size:0.82rem;margin-top:8px;display:none;">密码错误，请重试。</div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('btn-back-to-select').addEventListener('click', () => router.navigate('/test-select'));
+
+      const pwdInput = document.getElementById('admin-pwd-input');
+      const errorTip = document.getElementById('admin-pwd-error');
+
+      const tryUnlock = () => {
+        const pwd = pwdInput.value.trim();
+        if (userManager.verifyAdmin(pwd)) {
+          errorTip.style.display = 'none';
+          // 密码正确，跳过 guard 直接渲染完整报告
+          renderFullReport(app);
+        } else {
+          errorTip.style.display = 'block';
+          pwdInput.value = '';
+          pwdInput.focus();
+        }
+      };
+
+      document.getElementById('admin-unlock-btn').addEventListener('click', tryUnlock);
+      pwdInput.addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
+    };
+
+    renderIncomplete();
+    return;
+  }
+
+  renderFullReport(app);
+}
+
+// 实际渲染完整报告的函数（供正常流程和管理员解锁共用）
+function renderFullReport(app) {
+  const user = store.get('user');
 
   const results = store.get('testResults') || {};
   const dimensionScores = DIMENSIONS.map(dimension => ({
@@ -325,10 +396,28 @@ export function renderReport(app) {
   document.getElementById('btn-history').addEventListener('click', () => router.navigate('/history'));
   document.getElementById('btn-view-history').addEventListener('click', () => router.navigate('/history'));
   document.getElementById('btn-restart').addEventListener('click', () => {
-    if (confirm('确定要重新开始测评吗？当前数据将被清除。')) {
+    // 自定义确认弹窗替代 native confirm
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
+    overlay.innerHTML = `
+      <div style="background:#1e1e2e;border-radius:16px;padding:28px 24px;max-width:420px;width:90%;text-align:center;">
+        <div style="font-size:2.5rem;margin-bottom:12px;">🔄</div>
+        <h3 style="color:#fff;margin-bottom:8px;">重新开始测评？</h3>
+        <p style="color:#aaa;font-size:0.88rem;margin-bottom:20px;">当前所有数据将被清除，无法恢复。</p>
+        <div style="display:flex;gap:12px;">
+          <button id="restart-cancel" style="flex:1;padding:10px;border:1px solid #555;background:transparent;border-radius:8px;cursor:pointer;color:#fff;">取消</button>
+          <button id="restart-confirm" style="flex:1;padding:10px;border:none;background:#ef4444;color:#fff;border-radius:8px;cursor:pointer;font-weight:700;">确认重置</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    document.getElementById('restart-cancel').onclick = () => overlay.remove();
+    document.getElementById('restart-confirm').onclick = () => {
+      overlay.remove();
       store.reset();
       router.navigate('/');
-    }
+    };
   });
   document.getElementById('btn-back-select').addEventListener('click', () => router.navigate('/test-select'));
   document.getElementById('btn-switch-user').addEventListener('click', () => router.navigate('/login'));

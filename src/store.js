@@ -141,9 +141,11 @@ class Store {
     }
 
     getAgeGroup(age) {
-        if (age >= 5 && age <= 7) return '5-7岁组';
-        if (age >= 8 && age <= 14) return '8-14岁组';
-        if (age >= 15 && age <= 18) return '15-18岁组';
+        // 对齐中国教育阶段
+        if (age >= 5 && age <= 7) return '5-7岁组';   // 幼儿园/小学1年级
+        if (age >= 8 && age <= 11) return '8-11岁组';  // 小学2-5年级
+        if (age >= 12 && age <= 14) return '12-14岁组'; // 初中1-3年级
+        if (age >= 15 && age <= 18) return '15-18岁组'; // 高中1-3年级
         return '未知';
     }
 
@@ -184,8 +186,9 @@ class Store {
 
     getCompletedSubTestCount() {
         let count = 0;
-        Object.values(this.state.testProgress).forEach(p => {
-            count += p.subTests.filter(Boolean).length;
+        DIMENSIONS.forEach(dim => {
+            const p = this.state.testProgress[dim.key];
+            if (p) count += p.subTests.filter(Boolean).length;
         });
         return count;
     }
@@ -195,7 +198,7 @@ class Store {
     }
 
     isAllCompleted() {
-        return Object.values(this.state.testProgress).every(p => p.completed);
+        return DIMENSIONS.every(dim => this.state.testProgress[dim.key]?.completed === true);
     }
 
     getOverallScores() {

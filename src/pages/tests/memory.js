@@ -564,10 +564,12 @@ function showResult(score, testName, achieved, total, nextSubIndex) {
 
 function getDifficulty(ageGroup) {
   const configs = {
-    '5-7岁组': { startLength: 3, maxLength: 6, memoryTime: 120, memoryItems: 6 },
-    '8-14岁组': { startLength: 4, maxLength: 8, memoryTime: 120, memoryItems: 8 }
+    '5-7岁组': { startLength: 2, maxLength: 5, memoryTime: 120, memoryItems: 5 },  // 幼小园: 短序列, 少项
+    '8-11岁组': { startLength: 4, maxLength: 7, memoryTime: 120, memoryItems: 7 },  // 小学: 中等长度
+    '12-14岁组': { startLength: 5, maxLength: 9, memoryTime: 120, memoryItems: 9 },  // 初中: 较长序列
+    '15-18岁组': { startLength: 6, maxLength: 11, memoryTime: 120, memoryItems: 12 }, // 高中: 长序列
   };
-  return configs[ageGroup] || configs['8-14岁组'];
+  return configs[ageGroup] || configs['8-11岁组'];
 }
 
 function getQuickLevel(score) {

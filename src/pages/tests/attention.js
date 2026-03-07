@@ -696,11 +696,18 @@ function showResult(score, testName, achieved, total, nextSubIndex) {
 }
 
 function getDifficulty(ageGroup) {
+  // 中国教育阶段难度配置
+  // 小孧1-2年级: 丰富图形小题量, 长时限, 大刺激间隔
+  // 小学2-5年级: 中等题量, 适中时限
+  // 初中: 较多题量, 紧凑时限, 小刺激间隔
+  // 高中: 大题量, 最短时限, 最小刺激间隔
   const configs = {
-    '5-7岁组': { selectiveRounds: 8, selectiveTime: 60, selectiveItems: 9, sustainedCount: 20, sustainedTime: 45, sustainedInterval: 2000, switchRounds: 8, switchTime: 60 },
-    '8-14岁组': { selectiveRounds: 12, selectiveTime: 50, selectiveItems: 16, sustainedCount: 30, sustainedTime: 55, sustainedInterval: 1500, switchRounds: 12, switchTime: 50 }
+    '5-7岁组': { selectiveRounds: 6, selectiveTime: 70, selectiveItems: 9, sustainedCount: 16, sustainedTime: 50, sustainedInterval: 2200, switchRounds: 6, switchTime: 70 },
+    '8-11岁组': { selectiveRounds: 10, selectiveTime: 55, selectiveItems: 16, sustainedCount: 24, sustainedTime: 55, sustainedInterval: 1800, switchRounds: 10, switchTime: 55 },
+    '12-14岁组': { selectiveRounds: 14, selectiveTime: 50, selectiveItems: 20, sustainedCount: 32, sustainedTime: 55, sustainedInterval: 1400, switchRounds: 14, switchTime: 50 },
+    '15-18岁组': { selectiveRounds: 18, selectiveTime: 45, selectiveItems: 25, sustainedCount: 40, sustainedTime: 50, sustainedInterval: 1100, switchRounds: 18, switchTime: 45 },
   };
-  return configs[ageGroup] || configs['8-14岁组'];
+  return configs[ageGroup] || configs['8-11岁组'];
 }
 
 function getQuickLevel(score) {
@@ -713,14 +720,13 @@ function getQuickLevel(score) {
 /* ===== 子测试4: 注意广度 — 速示点阵 ===== */
 function renderAttentionSpan(app) {
   const ageGroup = store.get('user.ageGroup');
-  // 8-14岁组（年龄超过12岁）跳过此子测试，给满分后结束
-  if (ageGroup === '8-14岁组') {
-    const reactionTimer = new ReactionTimer();
+  // 高中阶段取消此子测试跳过（注意广度分析适屑15岁以下）
+  if (ageGroup === '15-18岁组') {
     store.setTestResult('attention', 3, 33, {
       name: '注意广度', correct: 12, total: 12, wrong: 0,
       correctRate: 100, avgReactionTime: 0,
       questionLogs: [],
-      skipped: true, skipReason: '年龄超过适用范围（5-12岁），自动跳过'
+      skipped: true, skipReason: '注意广度适用于5-14岁，高中阶段自动跳过'
     });
     showResult(33, '注意广度', 12, 12, -1);
     return;

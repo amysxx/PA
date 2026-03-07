@@ -10,6 +10,20 @@ const TESTS = [
   { name: '心理运动速度', next: -1, timeLimit: 70 },
 ];
 
+/**
+ * 按中国教育阶段返回处理速度难度配置
+ * 幵执行: 幼小园/小学/初中/高中 逆次增巠
+ */
+function getDifficulty(ageGroup) {
+  const configs = {
+    '5-7岁组': { rounds: 12, perceptTime: 70, psychomotorTime: 80, matchDelay: [900, 2500] },
+    '8-11岁组': { rounds: 18, perceptTime: 60, psychomotorTime: 70, matchDelay: [800, 2000] },
+    '12-14岁组': { rounds: 24, perceptTime: 55, psychomotorTime: 60, matchDelay: [700, 1800] },
+    '15-18岁组': { rounds: 30, perceptTime: 50, psychomotorTime: 55, matchDelay: [600, 1500] },
+  };
+  return configs[ageGroup] || configs['8-11岁组'];
+}
+
 export function renderProcessing(app) {
   const user = store.get('user');
   if (!user.name) {
@@ -73,11 +87,10 @@ function showResult(score, testName, correct, total, nextSub) {
         <div style="font-family:var(--font-display); font-size:3rem; font-weight:900; color:#F39C12; margin:12px 0;">${Math.round(score)}分</div>
         <div class="modal-text">正确: ${correct}/${total}</div>
         <div class="modal-actions">
-          ${
-            nextSub >= 0
-              ? '<button class="btn btn-primary" id="btn-next">继续下一项 →</button>'
-              : '<button class="btn btn-primary" id="btn-back">返回选择</button>'
-          }
+          ${nextSub >= 0
+      ? '<button class="btn btn-primary" id="btn-next">继续下一项 →</button>'
+      : '<button class="btn btn-primary" id="btn-back">返回选择</button>'
+    }
         </div>
       </div>
     </div>
@@ -99,9 +112,12 @@ function renderSubTest(app, subIndex) {
 }
 
 function renderPerceptualSpeed(app) {
-  renderShell(app, '🔎', '知觉速度', '快速判断符号是否一致', TESTS[0].timeLimit);
+  const ageGroup = store.get('user.ageGroup');
+  const diff = getDifficulty(ageGroup);
+  const rounds = diff.rounds;
+  const perceptTime = diff.perceptTime;
+  renderShell(app, '🔎', '知觉速度', '快速判断符号是否一致', perceptTime);
   const symbols = ['▲', '■', '●', '◆', '★', '◼', '⬢', '⬣'];
-  const rounds = 18;
   let index = 0;
   let correct = 0;
   let wrong = 0;
@@ -161,7 +177,7 @@ function renderPerceptualSpeed(app) {
   };
 
   currentTimer = new Timer(
-    TESTS[0].timeLimit,
+    perceptTime,
     rem => {
       timerEl.innerHTML = `⏱️ ${currentTimer.getFormatted()}`;
       if (rem <= 10) timerEl.classList.add('warning');
@@ -174,8 +190,11 @@ function renderPerceptualSpeed(app) {
 }
 
 function renderPsychomotorSpeed(app) {
-  renderShell(app, '⚡', '心理运动速度', '看到“现在点击”后立刻按下按钮', TESTS[1].timeLimit);
-  const totalTrials = 15;
+  const diff = getDifficulty(store.get('user.ageGroup'));
+  const totalTrials = diff.rounds;
+  const psychomotorTime = diff.psychomotorTime;
+  const [delayMin, delayMax] = diff.matchDelay;
+  renderShell(app, '⚡', '心理运动速度', '看到“现在点击”后立刻按下按钮', psychomotorTime);
   let trial = 0;
   let correct = 0;
   let wrong = 0;
@@ -217,7 +236,7 @@ function renderPsychomotorSpeed(app) {
 
     const reactBtn = document.getElementById('react-btn');
     reactBtn.dataset.ready = 'false';
-    const delay = 800 + Math.floor(Math.random() * 1500);
+    const delay = delayMin + Math.floor(Math.random() * (delayMax - delayMin));
     signalTimeoutId = setTimeout(() => {
       if (subtestFinished || !reactBtn.isConnected) return;
       signalTimeoutId = null;
@@ -266,7 +285,7 @@ function renderPsychomotorSpeed(app) {
   };
 
   currentTimer = new Timer(
-    TESTS[1].timeLimit,
+    psychomotorTime,
     rem => {
       timerEl.innerHTML = `⏱️ ${currentTimer.getFormatted()}`;
       if (rem <= 10) timerEl.classList.add('warning');

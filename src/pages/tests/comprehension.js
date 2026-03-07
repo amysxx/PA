@@ -10,6 +10,7 @@ import { Timer, ReactionTimer } from '../../utils/timer.js';
 import { calculateScore } from '../../utils/scoring.js';
 import { TestSession, showPauseOverlay } from '../../utils/testSession.js';
 import { questionManager } from '../../utils/questionManager.js';
+import { builtinQuestions } from '../../data/questionPool.js';
 
 let currentTimer = null;
 let currentSession = null;
@@ -46,18 +47,9 @@ async function renderLanguageComprehension(app) {
     return;
   }
 
-  // 内置题库
-  const questionsPool = diff.ageGroup === '5-7岁组' ? [
-    { q: '猫 → 动物，苹果 → ？', options: ['水果', '蔬菜', '动物', '植物'], answer: 0 },
-    { q: '白天 → 太阳，晚上 → ？', options: ['月亮', '太阳', '星星', '云朵'], answer: 0 },
-    { q: '笔 → 写字，剪刀 → ？', options: ['剪纸', '画画', '写字', '折纸'], answer: 0 },
-    { q: '大 → 小，长 → ？', options: ['短', '高', '粗', '细'], answer: 0 }
-  ] : [
-    { q: '摄影 → 相机，绘画 → ？', options: ['画笔', '钢笔', '铅笔', '粉笔'], answer: 0 },
-    { q: '蚕 → 丝绸，蜜蜂 → ？', options: ['蜂蜜', '花粉', '蜂蜡', '蜂巢'], answer: 0 },
-    { q: '勇敢 → 怯懦，慷慨 → ？', options: ['吝啬', '大方', '善良', '小气'], answer: 0 },
-    { q: '水 → 液体，冰 → ？', options: ['固体', '液体', '气体', '等离子'], answer: 0 }
-  ];
+  // 内置题库（按中国学段4档分级）
+  const langPoolMap = builtinQuestions.langPoolMap;
+  const questionsPool = langPoolMap[diff.ageGroup] || langPoolMap['8-11岁组'];
 
   const totalRounds = Math.min(diff.rounds, questionsPool.length);
   const questions = questionsPool.slice(0, totalRounds);
@@ -162,17 +154,9 @@ async function renderLogicalReasoning(app) {
     return;
   }
 
-  const questionsPool = diff.ageGroup === '5-7岁组' ? [
-    { q: '2, 4, 6, 8, ？', options: ['9', '10', '11', '12'], answer: 1 },
-    { q: '1, 3, 5, 7, ？', options: ['8', '9', '10', '11'], answer: 1 },
-    { q: '🔴🔵🔴🔵🔴？', options: ['🔴', '🔵', '🟢', '🟡'], answer: 1 },
-    { q: '△○△○△？', options: ['△', '○', '□', '☆'], answer: 1 }
-  ] : [
-    { q: '3, 6, 12, 24, ？', options: ['36', '48', '30', '42'], answer: 1 },
-    { q: '1, 4, 9, 16, ？', options: ['20', '25', '24', '36'], answer: 1 },
-    { q: '100, 81, 64, 49, ？', options: ['25', '36', '30', '40'], answer: 1 },
-    { q: '1, 8, 27, 64, ？', options: ['100', '125', '81', '216'], answer: 1 }
-  ];
+
+  const logicPoolMap = builtinQuestions.logicPoolMap;
+  const questionsPool = logicPoolMap[diff.ageGroup] || logicPoolMap['8-11岁组'];
 
   const totalRounds = Math.min(diff.rounds, questionsPool.length);
   const questions = questionsPool.slice(0, totalRounds);
@@ -508,37 +492,32 @@ function showResult(score, testName, achieved, total, nextSubIndex) {
 
 function getDifficulty(ageGroup) {
   const configs = {
-    '5-7岁组': { ageGroup: '5-7岁组', rounds: 4, timeLimit: 60 },
-    '8-14岁组': { ageGroup: '8-14岁组', rounds: 8, timeLimit: 90 }
+    '5-7岁组': { ageGroup: '5-7岁组', rounds: 4, timeLimit: 70 },  // 幼小园: 4题, 宽松时限
+    '8-11岁组': { ageGroup: '8-11岁组', rounds: 6, timeLimit: 90 },  // 小学中年级: 6题
+    '12-14岁组': { ageGroup: '12-14岁组', rounds: 8, timeLimit: 90 },  // 初中: 8题
+    '15-18岁组': { ageGroup: '15-18岁组', rounds: 10, timeLimit: 90 },  // 高中: 10题, 激版
   };
-  return configs[ageGroup] || configs['8-14岁组'];
+  return configs[ageGroup] || configs['8-11岁组'];
 }
 
 /* ===== 子测试3: 类比推理 — A:B=C:? ===== */
 function renderAnalogicalReasoning(app) {
   const ageGroup = store.get('user.ageGroup');
-  // 少于6岁跳过
   if (ageGroup === '5-7岁组') {
     store.setTestResult('comprehension', 3, 33, {
       name: '类比推理', correct: 0, total: 0, wrong: 0,
       correctRate: 100, avgReactionTime: 0, questionLogs: [],
-      skipped: true, skipReason: '年龄不足5-6岁不在适用范围（6岁+），跳过'
+      skipped: true, skipReason: '年龄不足（6岁+），跳过'
     });
     renderSubTest(app, 4);
     return;
   }
-  const questions = [
-    { q: '手:手套 = 脚:?', options: ['鞋子', '帽子', '袖子', '裤子'], answer: 0 },
-    { q: '医生:医院 = 老师:?', options: ['学校', '公司', '工厂', '商店'], answer: 0 },
-    { q: '鸟:羽毛 = 鱼:?', options: ['鳞片', '内脏', '骨骼', '腾'], answer: 0 },
-    { q: '原子:分子 = 华文:汉字', options: ['字母', '单词', '词语', '句子'], answer: 0 },
-    { q: '身高:米 = 温度:?', options: ['摄氏度', '公尺', '味道', '天气'], answer: 0 },
-    { q: '钢琴:好了一句:? = 笔:记录', options: ['英文', '音乐', '汉字', '题目'], answer: 1 },
-    { q: '呆瓜:智慧 = 黑暗:光明', options: ['光明', '黑暗', '呆瓜', '智慧'], answer: 0 },
-    { q: '海洋:深弹 = 山帕:平坦', options: ['平坦', '山帕', '驱氐', '混浊'], answer: 0 },
-    { q: '友谊:敢意 = 坡度:敬业', options: ['唆恶', '敬业', '胆多了', '善良'], answer: 1 },
-    { q: '每天:日 = 每年:?', options: ['年', '周', '月', '时'], answer: 2 },
-  ];
+
+  // 每道题结构: { a, b, c, options, answer(0-based) }
+  // 题面渲染：A : B = C : ?
+  const questions = builtinQuestions.analogyPool.slice(0); // 复制一份防污染
+  questions.sort(() => Math.random() - 0.5); // 打乱出题顺序
+
   const timeLimit = 90;
   let round = 0;
   let correct = 0;
@@ -556,25 +535,46 @@ function renderAnalogicalReasoning(app) {
     const contentEl = document.getElementById('test-inner-content');
     if (!contentEl) return;
     reactionTimer.start();
+
     contentEl.innerHTML = `
       <div class="test-question">
         <span style="font-size:0.85rem; color:var(--text-light);">第 ${round + 1}/${questions.length} 题</span><br/>
-        <span style="font-size:1.3rem; font-weight:700;">${q.q}</span>
+        <div style="margin-top:14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:center;"
+             aria-label="类比推理题目">
+          <div style="background:var(--bg-card); border-radius:12px; padding:12px 20px; font-size:1.3rem; font-weight:700; box-shadow:var(--shadow-sm);">${q.a}</div>
+          <span style="font-size:1.6rem; color:var(--primary); font-weight:900;">:</span>
+          <div style="background:var(--bg-card); border-radius:12px; padding:12px 20px; font-size:1.3rem; font-weight:700; box-shadow:var(--shadow-sm);">${q.b}</div>
+          <span style="font-size:1.3rem; color:var(--text-secondary); font-weight:700;">=</span>
+          <div style="background:var(--bg-card); border-radius:12px; padding:12px 20px; font-size:1.3rem; font-weight:700; box-shadow:var(--shadow-sm);">${q.c}</div>
+          <span style="font-size:1.6rem; color:var(--primary); font-weight:900;">:</span>
+          <div style="background:linear-gradient(135deg,rgba(108,92,231,0.15),rgba(162,155,254,0.15)); border:2px dashed var(--primary); border-radius:12px; padding:12px 28px; font-size:1.5rem; font-weight:900; color:var(--primary); letter-spacing:4px;">？</div>
+        </div>
       </div>
       <div class="test-options" style="max-width:480px;">
         ${q.options.map((opt, i) => `<div class="test-option" data-idx="${i}">${String.fromCharCode(65 + i)}. ${opt}</div>`).join('')}
       </div>
     `;
+
     contentEl.querySelectorAll('.test-option').forEach(opt => {
       opt.addEventListener('click', () => {
         reactionTimer.record();
         const idx = parseInt(opt.dataset.idx);
         const isCorrect = idx === q.answer;
-        questionLogs.push({ prompt: q.q, userAnswer: q.options[idx], correctAnswer: q.options[q.answer], isCorrect });
+        questionLogs.push({
+          prompt: `${q.a}:${q.b} = ${q.c}:?`,
+          userAnswer: q.options[idx],
+          correctAnswer: q.options[q.answer],
+          isCorrect
+        });
         if (isCorrect) { correct++; opt.classList.add('correct'); }
-        else { wrong++; opt.classList.add('wrong'); contentEl.querySelectorAll('.test-option').forEach(o => { if (parseInt(o.dataset.idx) === q.answer) o.classList.add('correct'); }); }
+        else {
+          wrong++; opt.classList.add('wrong');
+          contentEl.querySelectorAll('.test-option').forEach(o => {
+            if (parseInt(o.dataset.idx) === q.answer) o.classList.add('correct');
+          });
+        }
         round++;
-        setTimeout(nextTrial, 500);
+        setTimeout(nextTrial, 600);
       });
     });
   }
@@ -590,7 +590,7 @@ function renderAnalogicalReasoning(app) {
             <div class="test-header-icon" style="background:linear-gradient(135deg, #A29BFE, #6C5CE7);">🔗</div>
             <div>
               <div class="test-header-title">理解力 · 类比推理</div>
-              <div class="test-header-subtitle">A:对B就像C:对？</div>
+              <div class="test-header-subtitle">A:B 等于 C:?，找出对应关系</div>
             </div>
           </div>
           <div class="test-timer" id="timer">⏱️ ${Math.floor(timeLimit / 60)}:${(timeLimit % 60).toString().padStart(2, '0')}</div>
@@ -630,16 +630,8 @@ function renderRelationalReasoning(app) {
     renderSubTest(app, -99);
     return;
   }
-  const questions = [
-    { q: 'A比B高，B比C高，谁最矮？', options: ['A', 'B', 'C', '一样高'], answer: 2 },
-    { q: '苹果比茹莓甜，荣谁比茹莓淫，荣谁比苹果如何？', options: ['甜', '淫', '一样', '无法判断'], answer: 0 },
-    { q: '5个小朋友排一排，小明在第3个，小红在小明前面，小红是第几个？', options: ['第1个', '第2个', '第3个', '第4个'], answer: 1 },
-    { q: 'A比B重，B和C一样重，C比D重。谁最轻？', options: ['A', 'B', 'C', 'D'], answer: 3 },
-    { q: '同学赛跾，小明比小红跑得快，小灬比小明跑得慢。谁跑得最快？', options: ['小灬', '小明', '小红', '无法判断'], answer: 2 },
-    { q: '台上有红、黄、蓝3颗吃糖。小红吃了红和黄的，小明吃了黄和蓝的，谁吃过黄色吃糖？', options: ['小红', '小明', '都吃过', '都没吃'], answer: 2 },
-    { q: '【A>B, C>B】，A和C谁大？', options: ['A大', 'C大', '一样大', '无法判断'], answer: 3 },
-    { q: '大树和小树之间的距离是5米，小树和中树之间的距离是3米。大树和中树之间的距离可能是？', options: ['2米', '8米', '2或8米', '不确定'], answer: 2 },
-  ];
+  const questions = builtinQuestions.relationPool.slice(0);
+  questions.sort(() => Math.random() - 0.5);
   const timeLimit = 90;
   let round = 0;
   let correct = 0;
