@@ -1,7 +1,7 @@
 import { router } from '../router.js';
 import { store } from '../store.js';
 import { userManager } from '../userManager.js';
-import { exportUsersToExcel, exportToJSON } from '../utils/dataExport.js';
+import { exportUsersToExcel } from '../utils/dataExport.js';
 import { generateClassReportPDF } from '../utils/pdfGenerator.js';
 import { DIMENSIONS } from '../domain/dimensions.ts';
 
@@ -97,7 +97,6 @@ export function renderAdmin(app) {
         <button id="btn-analytics" class="btn btn-secondary" style="padding:6px 14px; font-size:0.8rem;">数据分析</button>
         <button id="btn-export-excel" class="btn btn-secondary" style="padding:6px 14px; font-size:0.8rem;">导出Excel</button>
         <button id="btn-export-pdf" class="btn btn-secondary" style="padding:6px 14px; font-size:0.8rem;">导出PDF</button>
-        <button id="btn-export-json" class="btn btn-secondary" style="padding:6px 14px; font-size:0.8rem;">导出JSON</button>
         <button id="btn-exit-admin" class="btn btn-secondary" style="padding:8px 20px; font-size:0.85rem;">退出管理</button>
       </div>
     </div>
@@ -171,10 +170,6 @@ export function renderAdmin(app) {
       return { ...data, user: data.user || item };
     });
     generateClassReportPDF(allData);
-  });
-  document.getElementById('btn-export-json').addEventListener('click', () => {
-    const allData = users.map(item => ({ user: item, ...(userManager.getUserData(item.id) || {}) }));
-    exportToJSON(allData, `assessment_data_${new Date().toISOString().slice(0, 10)}.json`);
   });
 
   // 查看详情

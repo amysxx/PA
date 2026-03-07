@@ -4,6 +4,42 @@
  */
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { ANTI_COUNTERFEIT_LINES, APP_VERSION } from '../constants/appInfo.js';
+
+function getRowInkScore(pixelData, width, y, sampleStep) {
+    let ink = 0;
+    const rowOffset = y * width * 4;
+    for (let x = 0; x < width; x += sampleStep) {
+        const idx = rowOffset + x * 4;
+        const alpha = pixelData[idx + 3];
+        if (alpha < 16) continue;
+        const brightness = (pixelData[idx] + pixelData[idx + 1] + pixelData[idx + 2]) / 3;
+        if (brightness < 247) ink++;
+    }
+    return ink;
+}
+
+function findNaturalBreakY(pixelData, width, height, currentTop, idealBottom, searchRange) {
+    const minY = Math.max(currentTop + 80, Math.floor(idealBottom - searchRange));
+    const maxY = Math.min(height - 1, Math.floor(idealBottom + searchRange));
+    if (minY >= maxY) return Math.min(height, Math.max(currentTop + 1, Math.floor(idealBottom)));
+
+    const sampleStep = Math.max(6, Math.floor(width / 120));
+    let bestY = Math.floor(idealBottom);
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    for (let y = minY; y <= maxY; y++) {
+        const ink = getRowInkScore(pixelData, width, y, sampleStep);
+        const distancePenalty = Math.abs(y - idealBottom) * 0.045;
+        const totalScore = ink + distancePenalty;
+        if (totalScore < bestScore) {
+            bestScore = totalScore;
+            bestY = y;
+        }
+    }
+
+    return bestY;
+}
 
 /**
  * 生成单个用户的测评报告 PDF
@@ -19,129 +55,90 @@ export async function generateUserReportPDF(elementToPrint, userName) {
     try {
         // 显示加载提示
         document.body.style.cursor = 'wait';
-
-        // 1. 智能分页处理
-        // A4 纸比例，假设宽度为 1, 高度约为 1.414
-        // 在 html2canvas 中，我们需要模拟 A4 纸的高度
-        // 这里的 strategy 不是预先计算 pixel，而是根据当前宽度的比例计算
-
-        const originalWidth = elementToPrint.scrollWidth;
-        // jsPDF A4 width is 210mm. We use this to calculate the equivalent height in pixels
-        // based on the element's width.
-        const a4Ratio = 297 / 210;
-        const pageHeightInPixels = originalWidth * a4Ratio;
-
-        // 备份原始样式，以便恢复
-        const originalStyles = [];
-        const spacers = [];
-
-        // 遍历一级子元素，计算累积高度
-        const children = Array.from(elementToPrint.children);
-        let accumulatedHeight = 0;
-
-        // 顶部 padding 也要算入
-        const computedStyle = window.getComputedStyle(elementToPrint);
-        accumulatedHeight += parseFloat(computedStyle.paddingTop) || 0;
-
-        children.forEach(child => {
-            // 跳过忽略的元素 (如 navbar 等，如果有 data-html2canvas-ignore)
-            if (child.hasAttribute('data-html2canvas-ignore') || child.style.display === 'none') return;
-
-            const childHeight = child.offsetHeight;
-            const childStyle = window.getComputedStyle(child);
-            const marginTop = parseFloat(childStyle.marginTop) || 0;
-            const marginBottom = parseFloat(childStyle.marginBottom) || 0;
-            const totalChildHeight = childHeight + marginTop + marginBottom;
-
-            // 检查当前元素是否跨越分页线
-            // 当前元素的起始位置
-            const currentStart = accumulatedHeight;
-            // 当前元素的结束位置
-            const currentEnd = accumulatedHeight + totalChildHeight;
-
-            // 所在的页码 (0-indexed)
-            const startPage = Math.floor(currentStart / pageHeightInPixels);
-            const endPage = Math.floor(currentEnd / pageHeightInPixels);
-
-            // 如果跨页了，且元素本身高度小于一页（避免大元素无限循环），则强制推到下一页
-            if (startPage !== endPage && totalChildHeight < pageHeightInPixels) {
-                // 计算需要增加的 margin-top
-                // 目标位置是下一页的起始位置
-                const nextPageStart = (startPage + 1) * pageHeightInPixels;
-                const spacerHeight = nextPageStart - currentStart;
-
-                // 记录原始样式以便恢复
-                originalStyles.push({ element: child, originalMarginTop: child.style.marginTop });
-
-                // 设置新的 margin-top (叠加原有的)
-                child.style.marginTop = `${marginTop + spacerHeight}px`;
-
-                // 更新累积高度：加上 spacer 和 元素高度
-                accumulatedHeight += spacerHeight + totalChildHeight;
-            } else {
-                accumulatedHeight += totalChildHeight;
-            }
-        });
-
-        // 2. 生成 Canvas
-        const canvas = await html2canvas(elementToPrint, {
-            scale: 2, // 提高清晰度
-            useCORS: true,
-            logging: false,
-            windowWidth: elementToPrint.scrollWidth,
-            windowHeight: elementToPrint.scrollHeight // 使用新的高度
-        });
-
-        // 3. 恢复样式
-        originalStyles.forEach(item => {
-            item.element.style.marginTop = item.originalMarginTop;
-        });
-
-        const contentWidth = canvas.width;
-        const contentHeight = canvas.height;
-
-        // A4 尺寸 (mm)
-        const pdfWidth = 210;
-        const pdfHeight = 297;
-
-        const margin = 10; // PDF 页边距
-        const imgWidth = pdfWidth - (margin * 2);
-        const imgHeight = (contentHeight * imgWidth) / contentWidth;
-
-        const doc = new jsPDF('p', 'mm', 'a4');
-
-        let heightLeft = imgHeight;
-        let position = 0;
-
-        const pageData = canvas.toDataURL('image/jpeg', 0.95);
-
-        // 第一页
-        doc.addImage(pageData, 'JPEG', margin, margin, imgWidth, imgHeight);
-        heightLeft -= (pdfHeight - margin * 2);
-
-        // 后续页
-        while (heightLeft > 0) {
-            position = heightLeft - imgHeight;
-            doc.addPage();
-            // 调整 position 以显示图片的下一部分
-            // 注意：addImage 的 y 参数如果是负数，相当于把图片向上移动，从而露出下面的部分
-            // 我们需要计算准确的偏移量。
-            // 每一页显示的图片高度由 PDF 页面高度决定 (减去 margin)
-            const pageContentHeight = pdfHeight - margin * 2;
-
-            // 当前页应该显示的图片区域的顶部在整个图片中的位置
-            // 第一页显示了 0 ~ pageContentHeight
-            // 第二页应该显示 pageContentHeight ~ 2 * pageContentHeight
-            // addImage 的 y 坐标应该是: margin - (当前页数 * pageContentHeight)
-
-            const currentPage = doc.internal.getNumberOfPages();
-            const yOffset = margin - ((currentPage - 1) * pageContentHeight);
-
-            doc.addImage(pageData, 'JPEG', margin, yOffset, imgWidth, imgHeight);
-            heightLeft -= pageContentHeight;
+        // 等字体加载完成，避免首屏文字丢失或空白
+        if (document.fonts?.ready) {
+            await document.fonts.ready;
         }
 
-        const fileName = `认知测评报告_${userName}_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.pdf`;
+        const canvas = await html2canvas(elementToPrint, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            logging: false,
+            windowWidth: elementToPrint.scrollWidth,
+            windowHeight: elementToPrint.scrollHeight,
+            scrollX: 0,
+            scrollY: -window.scrollY,
+            onclone: clonedDocument => {
+                const clonedBody = clonedDocument.body;
+                clonedBody.classList.add('pdf-export-mode');
+            },
+        });
+
+        const pdfWidth = 210;
+        const pdfHeight = 297;
+        const margin = 10;
+        const contentWidthMm = pdfWidth - margin * 2;
+        const contentHeightMm = pdfHeight - margin * 2;
+
+        const pxPerMm = canvas.width / contentWidthMm;
+        const pageHeightPx = Math.max(1, contentHeightMm * pxPerMm);
+        const seamOverlapPx = 1;
+        const searchRangePx = Math.min(260, Math.floor(pageHeightPx * 0.24));
+        const canvasCtx = canvas.getContext('2d');
+        const pixelData = canvasCtx ? canvasCtx.getImageData(0, 0, canvas.width, canvas.height).data : null;
+
+        const doc = new jsPDF('p', 'mm', 'a4');
+        let renderedPx = 0;
+        let pageIndex = 0;
+
+        while (renderedPx < canvas.height - 0.5) {
+            const idealBottom = renderedPx + pageHeightPx;
+            let cutBottom = Math.min(canvas.height, Math.ceil(idealBottom));
+
+            if (pixelData && idealBottom < canvas.height - 10) {
+                cutBottom = findNaturalBreakY(pixelData, canvas.width, canvas.height, Math.floor(renderedPx), idealBottom, searchRangePx);
+            }
+            cutBottom = Math.max(Math.floor(renderedPx + pageHeightPx * 0.62), cutBottom);
+            cutBottom = Math.min(canvas.height, cutBottom);
+
+            const sliceTop = Math.max(0, Math.floor(renderedPx - (pageIndex > 0 ? seamOverlapPx : 0)));
+            const sliceBottom = Math.max(sliceTop + 1, Math.ceil(cutBottom));
+            const sliceHeight = Math.max(1, sliceBottom - sliceTop);
+            const pageCanvas = document.createElement('canvas');
+            pageCanvas.width = canvas.width;
+            pageCanvas.height = sliceHeight;
+
+            const pageCtx = pageCanvas.getContext('2d');
+            if (!pageCtx) break;
+
+            pageCtx.fillStyle = '#ffffff';
+            pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+            pageCtx.drawImage(
+                canvas,
+                0,
+                sliceTop,
+                canvas.width,
+                sliceHeight,
+                0,
+                0,
+                canvas.width,
+                sliceHeight,
+            );
+
+            const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.95);
+            const sliceHeightMm = sliceHeight / pxPerMm;
+
+            if (pageIndex > 0) {
+                doc.addPage();
+            }
+            doc.addImage(pageImgData, 'JPEG', margin, margin, contentWidthMm, sliceHeightMm);
+
+            renderedPx = cutBottom;
+            pageIndex += 1;
+        }
+
+        const fileName = `认知测评报告_${userName}_${APP_VERSION}_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.pdf`;
         doc.save(fileName);
 
     } catch (error) {
@@ -174,6 +171,9 @@ export async function generateClassReportPDF(usersData) {
     let tableHtml = `
         <h1 style="text-align:center; margin-bottom:10px;">班级认知测评统计报告</h1>
         <p style="text-align:center; color:#666; margin-bottom:30px;">生成日期：${dateStr} · 参与人数：${usersData.length}</p>
+        <div style="margin:0 0 18px; padding:10px 14px; border:1px solid #d9d9d9; border-radius:8px; color:#4a4a4a; line-height:1.5;">
+          ${ANTI_COUNTERFEIT_LINES.map(line => `<div style="font-size:12px;">${line}</div>`).join('')}
+        </div>
         <table style="width:100%; border-collapse:collapse; font-size:12px;">
             <thead>
                 <tr style="background:#6C5CE7; color:#fff;">

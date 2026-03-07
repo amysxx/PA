@@ -4,10 +4,10 @@ import { userManager } from '../userManager.js';
 import { drawRadarChart } from '../utils/charts.js';
 import { getScoreLevel } from '../utils/scoring.js';
 import { generateUserReportPDF } from '../utils/pdfGenerator.js';
-import { exportUserToCSV } from '../utils/dataExport.js';
 import { DIMENSIONS, DIMENSION_IMPLEMENTED_INDICATOR_KEYS } from '../domain/dimensions.ts';
 import { FINE_GRAINED_FRAMEWORK } from '../domain/fineGrainedFramework.ts';
 import { generatePersonalizedAdvice } from '../utils/adviceEngine.js';
+import { ANTI_COUNTERFEIT_LINES } from '../constants/appInfo.js';
 
 const DIMENSION_THEME = {
   attention: { color: '#6C5CE7', gradient: 'linear-gradient(135deg, #6C5CE7, #A29BFE)' },
@@ -83,6 +83,39 @@ function buildQuestionBlocks(results) {
       groups: Object.entries(grouped).map(([indicatorName, logs]) => ({ indicatorName, logs })),
     };
   });
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function renderQuestionLogCard(log, index) {
+  const prompt = escapeHtml(log?.prompt || log?.shown || '未命名题目');
+  const shown = String(log?.shown || '').trim();
+  const userAnswer = escapeHtml(log?.userAnswer ?? '-');
+  const correctAnswer = escapeHtml(log?.correctAnswer ?? '-');
+  const statusClass = log?.isCorrect ? 'is-correct' : 'is-wrong';
+  const statusLabel = log?.isCorrect ? '回答正确' : '回答错误';
+
+  return `
+    <div class="report-answer-log">
+      <div class="report-answer-log-head">
+        <span class="report-answer-index">第${index + 1}题</span>
+        <span class="report-answer-state ${statusClass}">${statusLabel}</span>
+      </div>
+      <div class="report-answer-prompt">${prompt}</div>
+      ${shown ? `<div class="report-answer-shown">题面：${escapeHtml(shown)}</div>` : ''}
+      <div class="report-answer-options">
+        <div class="report-answer-option user">你的作答：${userAnswer}</div>
+        <div class="report-answer-option correct">正确答案：${correctAnswer}</div>
+      </div>
+    </div>
+  `;
 }
 
 export function renderReport(app) {
@@ -189,7 +222,6 @@ function renderFullReport(app) {
       </a>
       <div class="navbar-actions" style="display:flex; align-items:center; gap:8px;">
         <button class="btn btn-secondary" id="btn-export-pdf" style="padding:8px 16px; font-size:0.85rem;">导出PDF</button>
-        <button class="btn btn-secondary" id="btn-export-csv" style="padding:8px 16px; font-size:0.85rem;">导出CSV</button>
         <button class="btn btn-secondary" id="btn-history" style="padding:8px 16px; font-size:0.85rem;">历史记录</button>
         <button class="btn btn-secondary" id="btn-print" style="padding:8px 16px; font-size:0.85rem;">打印</button>
         <button id="btn-switch-user" class="btn btn-secondary" style="padding:6px 16px; font-size:0.8rem;">切换</button>
@@ -203,6 +235,9 @@ function renderFullReport(app) {
           <div style="font-size:4rem; margin-bottom:8px;">${overallLevel.emoji}</div>
           <h1 class="report-title">认知力测评报告</h1>
           <p class="report-subtitle">${user.name} · ${user.age}岁 · ${user.ageGroup}</p>
+          <div class="report-security-info report-security-info-hero">
+            ${ANTI_COUNTERFEIT_LINES.map(line => `<div class="report-security-line">${line}</div>`).join('')}
+          </div>
           <div style="margin-top:18px; display:inline-flex; align-items:center; gap:12px; background:var(--bg-card); padding:14px 24px; border-radius:var(--radius-full); box-shadow:var(--shadow-md);">
             <span style="font-size:0.9rem; color:var(--text-secondary);">综合评分</span>
             <span style="font-family:var(--font-display); font-size:2.3rem; font-weight:900; color:${overallLevel.color};">${overallScore}</span>
@@ -220,7 +255,7 @@ function renderFullReport(app) {
       .map((dimension, index) => {
         const level = getDimensionLevel(dimension.score);
         return `
-                <div class="score-card" style="background:${dimension.gradient}; animation:bounceIn 0.5s ease forwards; animation-delay:${0.2 + index * 0.1}s; opacity:0;">
+                <div class="score-card" style="background:${dimension.gradient};">
                   <div style="display:flex; align-items:center; gap:8px;">
                     <span style="font-size:1.5rem;">${dimension.icon}</span>
                     <span class="score-label">${dimension.name}</span>
@@ -271,53 +306,54 @@ function renderFullReport(app) {
             </div>` : ''}
         </div>
 
-        <div class="card" style="margin-top:24px; padding:24px;">
-          <h2 style="font-family:var(--font-display); font-size:1.1rem; font-weight:800; margin-bottom:16px;">子测评明细</h2>
-          ${dimensionScores
-      .map(dimension => {
-        return `
-                <div style="margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid #F0EDF7;">
-                  <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                    <span style="font-size:1.1rem;">${dimension.icon}</span>
-                    <span style="font-weight:800;">${dimension.name}</span>
-                    <span style="margin-left:auto; font-weight:800; color:${dimension.color};">${dimension.score}分</span>
-                  </div>
-                  ${dimension.details.length > 0
-            ? `
-                    <table style="width:100%; font-size:0.88rem; border-collapse:collapse;">
-                      <tr style="border-bottom:1px solid #F0EDF7;">
-                        <th style="text-align:left; padding:8px 0; color:var(--text-secondary); font-weight:600;">子测评/指标</th>
-                        <th style="text-align:center; padding:8px 0; color:var(--text-secondary); font-weight:600;">正确率</th>
-                        <th style="text-align:center; padding:8px 0; color:var(--text-secondary); font-weight:600;">反应时</th>
-                      </tr>
-                      ${dimension.details
-              .map(detail => {
-                const indicatorName = resolveIndicatorName(dimension, detail.name);
-                return `
-                            <tr>
-                              <td style="padding:8px 0; font-weight:600;">${indicatorName}</td>
-                              <td style="text-align:center; font-weight:700;">${detail.correctRate || 0}%</td>
-                              <td style="text-align:center; color:var(--text-secondary);">
-                                ${detail.avgReactionTime ? `${(detail.avgReactionTime / 1000).toFixed(1)}s` : '-'}
-                              </td>
-                            </tr>
-                          `;
-              })
-              .join('')}
-                    </table>
-                  `
-            : '<div style="font-size:0.85rem; color:var(--text-light);">暂无子测评明细</div>'
-          }
-                </div>
-              `;
-      })
-      .join('')}
+        <div class="card" style="margin-top:24px; padding:20px 24px;">
+          <h2 style="font-family:var(--font-display); font-size:1.1rem; font-weight:800;">子测评明细</h2>
         </div>
 
-        <div class="card" style="margin-top:24px; padding:24px;">
-          <h2 style="font-family:var(--font-display); font-size:1.1rem; font-weight:800; margin-bottom:16px;">题目清单（按精细化指标分组）</h2>
-          <div id="report-question-section" style="font-size:0.88rem; color:var(--text-secondary);">正在加载题目清单...</div>
+        ${dimensionScores
+      .map(dimension => {
+        return `
+            <div class="card report-dimension-card" style="margin-top:14px; padding:20px 24px;">
+              <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                <span style="font-size:1.1rem;">${dimension.icon}</span>
+                <span style="font-weight:800;">${dimension.name}</span>
+                <span style="margin-left:auto; font-weight:800; color:${dimension.color};">${dimension.score}分</span>
+              </div>
+              ${dimension.details.length > 0
+            ? `
+                <table style="width:100%; font-size:0.88rem; border-collapse:collapse;">
+                  <tr style="border-bottom:1px solid #F0EDF7;">
+                    <th style="text-align:left; padding:8px 0; color:var(--text-secondary); font-weight:600;">子测评/指标</th>
+                    <th style="text-align:center; padding:8px 0; color:var(--text-secondary); font-weight:600;">正确率</th>
+                    <th style="text-align:center; padding:8px 0; color:var(--text-secondary); font-weight:600;">反应时</th>
+                  </tr>
+                  ${dimension.details
+                .map(detail => {
+                  const indicatorName = resolveIndicatorName(dimension, detail.name);
+                  return `
+                        <tr>
+                          <td style="padding:8px 0; font-weight:600;">${indicatorName}</td>
+                          <td style="text-align:center; font-weight:700;">${detail.correctRate || 0}%</td>
+                          <td style="text-align:center; color:var(--text-secondary);">
+                            ${detail.avgReactionTime ? `${(detail.avgReactionTime / 1000).toFixed(1)}s` : '-'}
+                          </td>
+                        </tr>
+                      `;
+                })
+                .join('')}
+                </table>
+              `
+            : '<div style="font-size:0.85rem; color:var(--text-light);">暂无子测评明细</div>'}
+            </div>
+          `;
+      })
+      .join('')}
+
+        <div class="card" style="margin-top:24px; padding:20px 24px;">
+          <h2 style="font-family:var(--font-display); font-size:1.1rem; font-weight:800; margin-bottom:6px;">题目清单（按精细化指标分组）</h2>
+          <div style="font-size:0.82rem; color:var(--text-light);">尽量还原答题过程：题干、题面、作答与标准答案。</div>
         </div>
+        <div id="report-question-section" class="report-question-section">正在加载题目清单...</div>
 
         <div style="text-align:center; margin:36px 0; display:flex; gap:16px; justify-content:center; flex-wrap:wrap;" data-html2canvas-ignore="true">
           <button class="btn btn-primary" id="btn-restart">重新测评</button>
@@ -343,22 +379,17 @@ function renderFullReport(app) {
         .map(block => {
           if (block.groups.length === 0) return '';
           return `
-            <div style="margin-bottom:16px; border-bottom:1px solid #F0EDF7; padding-bottom:12px;">
-              <div style="font-weight:800; margin-bottom:8px;">${block.dimension.icon} ${block.dimension.name}</div>
+            <div class="card report-question-card" style="padding:20px 24px;">
+              <div style="font-weight:800; margin-bottom:10px; font-size:1rem;">${block.dimension.icon} ${block.dimension.name}</div>
               ${block.groups
               .map(
                 group => `
-                    <div style="margin:10px 0 12px;">
-                      <div style="font-weight:700; font-size:0.85rem; margin-bottom:6px;">${group.indicatorName}（${group.logs.length}题）</div>
-                      <ol style="margin:0; padding-left:18px;">
+                    <div class="report-question-group">
+                      <div class="report-question-group-title">${escapeHtml(group.indicatorName)}（${group.logs.length}题）</div>
+                      <ol class="report-question-list">
                         ${group.logs
                     .map(
-                      log => `<li style="margin-bottom:6px;">
-                              <div>${log.prompt || log.shown || '未命名题目'}</div>
-                              <div style="font-size:0.8rem; color:var(--text-light);">
-                                你的答案：${log.userAnswer ?? '-'} · 正确答案：${log.correctAnswer ?? '-'} · 结果：${log.isCorrect ? '正确' : '错误'}
-                              </div>
-                            </li>`,
+                      (log, index) => `<li>${renderQuestionLogCard(log, index)}</li>`,
                     )
                     .join('')}
                       </ol>
@@ -392,7 +423,6 @@ function renderFullReport(app) {
     const element = document.getElementById('report-container');
     generateUserReportPDF(element, user.name);
   });
-  document.getElementById('btn-export-csv').addEventListener('click', () => exportUserToCSV(user, results));
   document.getElementById('btn-history').addEventListener('click', () => router.navigate('/history'));
   document.getElementById('btn-view-history').addEventListener('click', () => router.navigate('/history'));
   document.getElementById('btn-restart').addEventListener('click', () => {
